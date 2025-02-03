@@ -178,7 +178,7 @@ class MetashapeWorkflowLefolab:
             # if self.cfg["exportCameras"]["enabled"]:
             #     self.export_cameras()
 
-        if self.cfg["highdis"]["enabled"]:
+        if self.cfg["HighDis"]["enabled"]:
             self.build_depth_maps_highdis()
             self.build_point_cloud_highdis()
             self.build_dem_highdis()
@@ -860,7 +860,7 @@ class MetashapeWorkflowLefolab:
         if self.cfg["buildPointCloud"]["export"]:
 
             output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_points.laz"
+                self.cfg["output_path"], self.run_id + "_pg.copc.laz"
             )
 
             if self.cfg["buildPointCloud"]["classes"] == "ALL":
@@ -877,7 +877,7 @@ class MetashapeWorkflowLefolab:
                 self.doc.chunk.exportPointCloud(
                     path=output_file,
                     source_data=Metashape.PointCloudData,
-                    format=Metashape.PointCloudFormatLAZ,
+                    format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
                     clases=self.cfg["buildPointCloud"]["classes"],
                     subdivide_task=self.cfg["subdivide_task"],
@@ -981,6 +981,7 @@ class MetashapeWorkflowLefolab:
             compression.tiff_big = self.cfg["buildDem"]["tiff_big"]
             compression.tiff_tiled = self.cfg["buildDem"]["tiff_tiled"]
             compression.tiff_overviews = self.cfg["buildDem"]["tiff_overviews"]
+            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
 
             if "DSM-ptcloud" in self.cfg["buildDem"]["surface"]:
                 start_time = time.time()
@@ -1005,7 +1006,7 @@ class MetashapeWorkflowLefolab:
                     )
 
                 output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_dsm-ptcloud.tif"
+                    self.cfg["output_path"], self.run_id + "_dsm.tif"
                 )
                 if self.cfg["buildDem"]["export"]:
                     self.doc.chunk.exportRaster(
@@ -1016,75 +1017,75 @@ class MetashapeWorkflowLefolab:
                         image_compression=compression,
                     )
 
-            if "DTM-ptcloud" in self.cfg["buildDem"]["surface"]:
+            # if "DTM-ptcloud" in self.cfg["buildDem"]["surface"]:
 
-                start_time = time.time()
+            #     start_time = time.time()
 
-                # call with point classes argument to specify ground points only
-                self.doc.chunk.buildDem(
-                    source_data=Metashape.PointCloudData,
-                    classes=Metashape.PointClass.Ground,
-                    subdivide_task=self.cfg["subdivide_task"],
-                    projection=projection,
-                    resolution=self.cfg["buildDem"]["resolution"],
-                )
+            #     # call with point classes argument to specify ground points only
+            #     self.doc.chunk.buildDem(
+            #         source_data=Metashape.PointCloudData,
+            #         classes=Metashape.PointClass.Ground,
+            #         subdivide_task=self.cfg["subdivide_task"],
+            #         projection=projection,
+            #         resolution=self.cfg["buildDem"]["resolution"],
+            #     )
 
-                time_taken = diff_time(time.time(), start_time)
+            #     time_taken = diff_time(time.time(), start_time)
 
-                self.doc.chunk.elevation.label = "DTM-ptcloud"
+            #     self.doc.chunk.elevation.label = "DTM-ptcloud"
 
-                # record results to file
-                with open(self.log_file, "a") as file:
-                    file.write(
-                        MetashapeWorkflowLefolab.sep.join(["Build DTM-ptcloud", time_taken])
-                        + "\n"
-                    )
+            #     # record results to file
+            #     with open(self.log_file, "a") as file:
+            #         file.write(
+            #             MetashapeWorkflowLefolab.sep.join(["Build DTM-ptcloud", time_taken])
+            #             + "\n"
+            #         )
 
-                output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_dtm-ptcloud.tif"
-                )
-                if self.cfg["buildDem"]["export"]:
-                    self.doc.chunk.exportRaster(
-                        path=output_file,
-                        projection=projection,
-                        nodata_value=self.cfg["buildDem"]["nodata"],
-                        source_data=Metashape.ElevationData,
-                        image_compression=compression,
-                    )
+            #     output_file = os.path.join(
+            #         self.cfg["output_path"], self.run_id + "_dtm-ptcloud.tif"
+            #     )
+            #     if self.cfg["buildDem"]["export"]:
+            #         self.doc.chunk.exportRaster(
+            #             path=output_file,
+            #             projection=projection,
+            #             nodata_value=self.cfg["buildDem"]["nodata"],
+            #             source_data=Metashape.ElevationData,
+            #             image_compression=compression,
+            #         )
 
-            if "DSM-mesh" in self.cfg["buildDem"]["surface"]:
+            # if "DSM-mesh" in self.cfg["buildDem"]["surface"]:
 
-                start_time = time.time()
+            #     start_time = time.time()
 
-                self.doc.chunk.buildDem(
-                    source_data=Metashape.ModelData,
-                    subdivide_task=self.cfg["subdivide_task"],
-                    projection=projection,
-                    resolution=self.cfg["buildDem"]["resolution"],
-                )
+            #     self.doc.chunk.buildDem(
+            #         source_data=Metashape.ModelData,
+            #         subdivide_task=self.cfg["subdivide_task"],
+            #         projection=projection,
+            #         resolution=self.cfg["buildDem"]["resolution"],
+            #     )
 
-                time_taken = diff_time(time.time(), start_time)
+            #     time_taken = diff_time(time.time(), start_time)
 
-                self.doc.chunk.elevation.label = "DSM-mesh"
+            #     self.doc.chunk.elevation.label = "DSM-mesh"
 
-                # record results to file
-                with open(self.log_file, "a") as file:
-                    file.write(
-                        MetashapeWorkflowLefolab.sep.join(["Build DSM-mesh", time_taken])
-                        + "\n"
-                    )
+            #     # record results to file
+            #     with open(self.log_file, "a") as file:
+            #         file.write(
+            #             MetashapeWorkflowLefolab.sep.join(["Build DSM-mesh", time_taken])
+            #             + "\n"
+            #         )
 
-                output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_dsm-mesh.tif"
-                )
-                if self.cfg["buildDem"]["export"]:
-                    self.doc.chunk.exportRaster(
-                        path=output_file,
-                        projection=projection,
-                        nodata_value=self.cfg["buildDem"]["nodata"],
-                        source_data=Metashape.ElevationData,
-                        image_compression=compression,
-                    )
+            #     output_file = os.path.join(
+            #         self.cfg["output_path"], self.run_id + "_dsm-mesh.tif"
+            #     )
+            #     if self.cfg["buildDem"]["export"]:
+            #         self.doc.chunk.exportRaster(
+            #             path=output_file,
+            #             projection=projection,
+            #             nodata_value=self.cfg["buildDem"]["nodata"],
+            #             source_data=Metashape.ElevationData,
+            #             image_compression=compression,
+            #         )
 
         # Each DEM has a label associated with it which is used to identify and activate the correct DEM for orthomosaic generation
         if self.cfg["buildOrthomosaic"]["enabled"]:
@@ -1163,13 +1164,14 @@ class MetashapeWorkflowLefolab:
         ## Export orthomosaic
         if self.cfg["buildOrthomosaic"]["export"]:
             output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_ortho_" + file_ending + ".tif"
+                self.cfg["output_path"], self.run_id + "_rgb" + ".tif"
             )
 
             compression = Metashape.ImageCompression()
             compression.tiff_big = self.cfg["buildOrthomosaic"]["tiff_big"]
             compression.tiff_tiled = self.cfg["buildOrthomosaic"]["tiff_tiled"]
             compression.tiff_overviews = self.cfg["buildOrthomosaic"]["tiff_overviews"]
+            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
 
             projection = Metashape.OrthoProjection()
             projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
@@ -1195,10 +1197,10 @@ class MetashapeWorkflowLefolab:
 
         # build depth maps only instead of also building the point cloud ##?? what does
         self.doc.chunk.buildDepthMaps(
-            downscale=self.cfg["buildDepthMaps"]["downscale"],
-            filter_mode=self.cfg["buildDepthMaps"]["filter_mode"],
-            reuse_depth=self.cfg["buildDepthMaps"]["reuse_depth"],
-            max_neighbors=self.cfg["buildDepthMaps"]["max_neighbors"],
+            downscale=self.cfg["buildDepthMapsHighDis"]["downscale"],
+            filter_mode=self.cfg["buildDepthMapsHighDis"]["filter_mode"],
+            reuse_depth=self.cfg["buildDepthMapsHighDis"]["reuse_depth"],
+            max_neighbors=self.cfg["buildDepthMapsHighDis"]["max_neighbors"],
             subdivide_task=self.cfg["subdivide_task"],
         )
 
@@ -1226,8 +1228,8 @@ class MetashapeWorkflowLefolab:
 
         # build point cloud
         self.doc.chunk.buildPointCloud(
-            max_neighbors=self.cfg["buildPointCloud"]["max_neighbors"],
-            keep_depth=self.cfg["buildPointCloud"]["keep_depth"],
+            max_neighbors=self.cfg["buildPointCloudHighDis"]["max_neighbors"],
+            keep_depth=self.cfg["buildPointCloudHighDis"]["keep_depth"],
             subdivide_task=self.cfg["subdivide_task"],
             point_colors=True,
         )
@@ -1245,18 +1247,18 @@ class MetashapeWorkflowLefolab:
         self.doc.save()
 
         # # classify ground points if specified
-        # if self.cfg["buildPointCloud"]["classify_ground_points"]:
+        # if self.cfg["buildPointCloudHighDis"]["classify_ground_points"]:
         #     self.classify_ground_points()
 
         ### Export points
 
-        if self.cfg["buildPointCloud"]["export"]:
+        if self.cfg["buildPointCloudHighDis"]["export"]:
 
             output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_points.laz"
+                self.cfg["output_path"], self.run_id + "_pg.copc.laz"
             )
 
-            if self.cfg["buildPointCloud"]["classes"] == "ALL":
+            if self.cfg["buildPointCloudHighDis"]["classes"] == "ALL":
                 # call without classes argument (Metashape then defaults to all classes)
                 self.doc.chunk.exportPointCloud(
                     path=output_file,
@@ -1270,9 +1272,9 @@ class MetashapeWorkflowLefolab:
                 self.doc.chunk.exportPointCloud(
                     path=output_file,
                     source_data=Metashape.PointCloudData,
-                    format=Metashape.PointCloudFormatLAZ,
+                    format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
-                    clases=self.cfg["buildPointCloud"]["classes"],
+                    clases=self.cfg["buildPointCloudHighDis"]["classes"],
                     subdivide_task=self.cfg["subdivide_task"],
                 )
 
@@ -1284,18 +1286,19 @@ class MetashapeWorkflowLefolab:
         """
 
 
-        if self.cfg["buildDem"]["enabled"]:
+        if self.cfg["buildDemHighDis"]["enabled"]:
             # prepping params for buildDem
             projection = Metashape.OrthoProjection()
             projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
 
             # prepping params for export
             compression = Metashape.ImageCompression()
-            compression.tiff_big = self.cfg["buildDem"]["tiff_big"]
-            compression.tiff_tiled = self.cfg["buildDem"]["tiff_tiled"]
-            compression.tiff_overviews = self.cfg["buildDem"]["tiff_overviews"]
+            compression.tiff_big = self.cfg["buildDemHighDis"]["tiff_big"]
+            compression.tiff_tiled = self.cfg["buildDemHighDis"]["tiff_tiled"]
+            compression.tiff_overviews = self.cfg["buildDemHighDis"]["tiff_overviews"]
+            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
 
-            if "DSM-ptcloud" in self.cfg["buildDem"]["surface"]:
+            if "DSM-ptcloud" in self.cfg["buildDemHighDis"]["surface"]:
                 start_time = time.time()
 
                 # call without point classes argument (Metashape then defaults to all classes)
@@ -1303,7 +1306,7 @@ class MetashapeWorkflowLefolab:
                     source_data=Metashape.PointCloudData,
                     subdivide_task=self.cfg["subdivide_task"],
                     projection=projection,
-                    resolution=self.cfg["buildDem"]["resolution"],
+                    resolution=self.cfg["buildDemHighDis"]["resolution"],
                 )
 
                 time_taken = diff_time(time.time(), start_time)
@@ -1318,94 +1321,120 @@ class MetashapeWorkflowLefolab:
                     )
 
                 output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_dsm-ptcloud.tif"
+                    self.cfg["output_path"], self.run_id + "_dsm.tif"
                 )
-                if self.cfg["buildDem"]["export"]:
+                if self.cfg["buildDemHighDis"]["export"]:
                     self.doc.chunk.exportRaster(
                         path=output_file,
                         projection=projection,
-                        nodata_value=self.cfg["buildDem"]["nodata"],
+                        nodata_value=self.cfg["buildDemHighDis"]["nodata"],
                         source_data=Metashape.ElevationData,
                         image_compression=compression,
                     )
 
-            if "DTM-ptcloud" in self.cfg["buildDem"]["surface"]:
+            # if "DTM-ptcloud" in self.cfg["buildDemHighDis"]["surface"]:
 
-                start_time = time.time()
+            #     start_time = time.time()
 
-                # call with point classes argument to specify ground points only
-                self.doc.chunk.buildDem(
-                    source_data=Metashape.PointCloudData,
-                    classes=Metashape.PointClass.Ground,
-                    subdivide_task=self.cfg["subdivide_task"],
-                    projection=projection,
-                    resolution=self.cfg["buildDem"]["resolution"],
-                )
+            #     # call with point classes argument to specify ground points only
+            #     self.doc.chunk.buildDem(
+            #         source_data=Metashape.PointCloudData,
+            #         classes=Metashape.PointClass.Ground,
+            #         subdivide_task=self.cfg["subdivide_task"],
+            #         projection=projection,
+            #         resolution=self.cfg["buildDem"]["resolution"],
+            #     )
 
-                time_taken = diff_time(time.time(), start_time)
+            #     time_taken = diff_time(time.time(), start_time)
 
-                self.doc.chunk.elevation.label = "DTM-ptcloud"
+            #     self.doc.chunk.elevation.label = "DTM-ptcloud"
 
-                # record results to file
-                with open(self.log_file, "a") as file:
-                    file.write(
-                        MetashapeWorkflowLefolab.sep.join(["Build DTM-ptcloud", time_taken])
-                        + "\n"
-                    )
+            #     # record results to file
+            #     with open(self.log_file, "a") as file:
+            #         file.write(
+            #             MetashapeWorkflowLefolab.sep.join(["Build DTM-ptcloud", time_taken])
+            #             + "\n"
+            #         )
 
-                output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_dtm-ptcloud.tif"
-                )
-                if self.cfg["buildDem"]["export"]:
-                    self.doc.chunk.exportRaster(
-                        path=output_file,
-                        projection=projection,
-                        nodata_value=self.cfg["buildDem"]["nodata"],
-                        source_data=Metashape.ElevationData,
-                        image_compression=compression,
-                    )
+            #     output_file = os.path.join(
+            #         self.cfg["output_path"], self.run_id + "_dtm-ptcloud.tif"
+            #     )
+            #     if self.cfg["buildDem"]["export"]:
+            #         self.doc.chunk.exportRaster(
+            #             path=output_file,
+            #             projection=projection,
+            #             nodata_value=self.cfg["buildDem"]["nodata"],
+            #             source_data=Metashape.ElevationData,
+            #             image_compression=compression,
+            #         )
 
-            if "DSM-mesh" in self.cfg["buildDem"]["surface"]:
+            # if "DSM-mesh" in self.cfg["buildDem"]["surface"]:
 
-                start_time = time.time()
+            #     start_time = time.time()
 
-                self.doc.chunk.buildDem(
-                    source_data=Metashape.ModelData,
-                    subdivide_task=self.cfg["subdivide_task"],
-                    projection=projection,
-                    resolution=self.cfg["buildDem"]["resolution"],
-                )
+            #     self.doc.chunk.buildDem(
+            #         source_data=Metashape.ModelData,
+            #         subdivide_task=self.cfg["subdivide_task"],
+            #         projection=projection,
+            #         resolution=self.cfg["buildDem"]["resolution"],
+            #     )
 
-                time_taken = diff_time(time.time(), start_time)
+            #     time_taken = diff_time(time.time(), start_time)
 
-                self.doc.chunk.elevation.label = "DSM-mesh"
+            #     self.doc.chunk.elevation.label = "DSM-mesh"
 
-                # record results to file
-                with open(self.log_file, "a") as file:
-                    file.write(
-                        MetashapeWorkflowLefolab.sep.join(["Build DSM-mesh", time_taken])
-                        + "\n"
-                    )
+            #     # record results to file
+            #     with open(self.log_file, "a") as file:
+            #         file.write(
+            #             MetashapeWorkflowLefolab.sep.join(["Build DSM-mesh", time_taken])
+            #             + "\n"
+            #         )
 
-                output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_dsm-mesh.tif"
-                )
-                if self.cfg["buildDem"]["export"]:
-                    self.doc.chunk.exportRaster(
-                        path=output_file,
-                        projection=projection,
-                        nodata_value=self.cfg["buildDem"]["nodata"],
-                        source_data=Metashape.ElevationData,
-                        image_compression=compression,
-                    )
+            #     output_file = os.path.join(
+            #         self.cfg["output_path"], self.run_id + "_dsm-mesh.tif"
+            #     )
+            #     if self.cfg["buildDem"]["export"]:
+            #         self.doc.chunk.exportRaster(
+            #             path=output_file,
+            #             projection=projection,
+            #             nodata_value=self.cfg["buildDem"]["nodata"],
+            #             source_data=Metashape.ElevationData,
+            #             image_compression=compression,
+            #         )
 
-        if self.cfg["buildPointCloud"]["remove_after_export"]:
+        # # Each DEM has a label associated with it which is used to identify and activate the correct DEM for orthomosaic generation
+        # if self.cfg["buildOrthomosaicHighDis"]["enabled"]:
+        #     # Iterate through each specified surface in the configuration
+        #     for surface in self.cfg["buildOrthomosaicHighDis"]["surface"]:
+        #         if surface == "Mesh":
+        #             # If the surface type is "Mesh", we do not need to activate an elevation model so we can go straight to building the orthomosaic
+        #             self.build_export_orthomosaic_higdis(from_mesh=True, file_ending="mesh")
+        #         else:
+        #             # Otherwise, we need to activate the appropriate DEM based on the DEM labels assigned when the DEMs were generated
+        #             dem_found = False
+        #             # Iterate through all the available DEMs
+        #             for elevation in self.doc.chunk.elevations:
+        #                 if elevation.label == surface:
+        #                     # If the DEM label matches the surface, activate the appropriate DEM
+        #                     self.doc.chunk.elevation = elevation
+        #                     dem_found = True
+        #                     break
+
+        #             if not dem_found:
+        #                 raise ValueError(
+        #                     f"Error: DEM for {surface} is not available.\n"
+        #                     "Ensure the DEM for the specified surface has been generated because it is needed for orthomosaic generation."
+        #                 )
+
+        #             self.build_export_orthomosaic_higdis(file_ending=surface.lower())
+
+        if self.cfg["buildPointCloudHighDis"]["remove_after_export"]:
             self.doc.chunk.remove(self.doc.chunk.point_clouds)
 
         self.doc.save()
 
         return True
-
+    
     # def add_align_secondary_photos(self):
     #     """
     #     Add and align a second set of photos, to be aligned only. The main use case for this currently
