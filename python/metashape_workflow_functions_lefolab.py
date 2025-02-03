@@ -837,6 +837,7 @@ class MetashapeWorkflowLefolab:
             keep_depth=self.cfg["buildPointCloud"]["keep_depth"],
             subdivide_task=self.cfg["subdivide_task"],
             point_colors=True,
+            replace_asset=True,
         )
 
         # get an ending time stamp for the previous step
@@ -992,6 +993,7 @@ class MetashapeWorkflowLefolab:
                     subdivide_task=self.cfg["subdivide_task"],
                     projection=projection,
                     resolution=self.cfg["buildDem"]["resolution"],
+                    replace_asset=True,
                 )
 
                 time_taken = diff_time(time.time(), start_time)
@@ -1147,6 +1149,7 @@ class MetashapeWorkflowLefolab:
             refine_seamlines=self.cfg["buildOrthomosaic"]["refine_seamlines"],
             subdivide_task=self.cfg["subdivide_task"],
             projection=projection,
+            replace_asset=True,
         )
 
         # get an ending time stamp for the previous step
@@ -1232,6 +1235,7 @@ class MetashapeWorkflowLefolab:
             keep_depth=self.cfg["buildPointCloudHighDis"]["keep_depth"],
             subdivide_task=self.cfg["subdivide_task"],
             point_colors=True,
+            replace_asset=True,
         )
 
         # get an ending time stamp for the previous step
@@ -1307,6 +1311,7 @@ class MetashapeWorkflowLefolab:
                     subdivide_task=self.cfg["subdivide_task"],
                     projection=projection,
                     resolution=self.cfg["buildDemHighDis"]["resolution"],
+                    replace_asset=True,
                 )
 
                 time_taken = diff_time(time.time(), start_time)
