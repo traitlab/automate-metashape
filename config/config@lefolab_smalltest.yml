@@ -171,7 +171,7 @@ buildOrthomosaic: # (Metashape: buildOrthomosaic, exportRaster)
     remove_after_export: False # Remove orthomosaic from project after export to reduce the metashape project file size
 
 HighDis:
-    enabled: False
+    enabled: True
 
 buildDepthMapsHighDis: # (Metashape: buildDepthMaps)
     downscale: 2 # How much to coarsen the photos when searching for matches to build the point cloud. For large photosets, values < 4 likely take prohibitively long. (1 - Ultra high, 2 - High, 4 - Medium, 8 - Low, 16 - Lowest) (https://www.agisoft.com/forum/index.php?topic=11697.0).
@@ -188,7 +188,7 @@ buildPointCloudHighDis: # (Metashape: buildPointCloud, (optionally) classifyGrou
     remove_after_export: False # Remove point cloud from project after export of all dependencies (DEMs) to reduce the metashape project file size
 
 buildDemHighDis: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaster)
-    enabled: False
+    enabled: True
     classify_ground_points: False # Should ground points be classified as part of this step? Note that an alternative is to calculate them as a part of buildPointCloud (above)
     surface: ["DSM-ptcloud"] # Options: "DTM-ptcloud", "DSM-ptcloud", and/or "DSM-mesh". Type of DEM to export and data to build it from (digital terrain model or digital surface model, and from point cloud or mesh)
     resolution: 0 # DSM resolution. Only affects DSM built using the mesh (other DSM types are set by Metashape and not customizable). Note that this also sets the resolution of the orthomosaic built from this DSM, which is 1/4 of the DSM resolution. If using a mesh-derived DSM, and you also desire an orthomosaic with maximal detail, set the DEM resolution to 4x your GSD. Set to 0 to use Metashape-determined default.
