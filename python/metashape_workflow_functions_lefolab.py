@@ -869,7 +869,7 @@ class MetashapeWorkflowLefolab:
                 self.doc.chunk.exportPointCloud(
                     path=output_file,
                     source_data=Metashape.PointCloudData,
-                    format=Metashape.PointCloudFormatLAS,
+                    format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
                     subdivide_task=self.cfg["subdivide_task"],
                 )
@@ -1267,7 +1267,7 @@ class MetashapeWorkflowLefolab:
                 self.doc.chunk.exportPointCloud(
                     path=output_file,
                     source_data=Metashape.PointCloudData,
-                    format=Metashape.PointCloudFormatLAS,
+                    format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
                     subdivide_task=self.cfg["subdivide_task"],
                 )
