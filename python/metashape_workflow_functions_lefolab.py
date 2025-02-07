@@ -222,7 +222,7 @@ class MetashapeWorkflowLefolab:
             self.cfg["project_path"], ".".join([self.run_id, "psx"])
         )
         self.log_file = os.path.join(
-            self.cfg["output_path"], ".".join([self.run_id + "_log", "txt"])
+            self.cfg["project_path"], ".".join([self.run_id + "_log", "txt"])
         )
 
         """
