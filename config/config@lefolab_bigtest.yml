@@ -10,7 +10,7 @@ load_project: ""
 # If there are multiple photo folders, set path to the folder that contains all the photo folders,
 # or provide a list of paths via the YAML list syntax (e.g., ["/path/to/photo/folder1", "/path/to/photo/folder2"])
 # If there are no photos to add (e.g., this is an existing project that already has photos in it, set to an empty string ("")
-photo_path: "/mnt/nfs/lefodata/data/drone_missions/2025/20250116_tbscabins_m3e"
+images_path: "/mnt/nfs/lefodata/data/drone_missions/2025/20250116_tbscabins_m3e"
 
 # The path to a secondary directory of flight photos, which are only aligned to the project *after*
 # all the other processing is done. This is useful if you want to use secondary photos for multiview
