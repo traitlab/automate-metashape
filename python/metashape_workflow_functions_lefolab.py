@@ -4,6 +4,7 @@ import glob
 import os
 import platform
 import re
+import tempfile
 
 # Import the fuctionality we need to make time stamps to measure performance
 import time
@@ -110,6 +111,10 @@ class MetashapeWorkflowLefolab:
         # Remove any override options that are None
         override_dict = {k: v for k, v in override_dict.items() if v is not None}
 
+        # Disable HighDis processing if specified in the CLI
+        if override_dict.get("highdis_disabled") is True:
+            self.cfg["HighDis"]["enabled"] = False
+
         # Since the CLI parser has nargs="+" for the photo_path, it will always be a list of values
         # even if only one is provided. To match the format of the yaml parser, if only one value
         # is provided, transform from a list of length one to just the value in that list
@@ -196,11 +201,15 @@ class MetashapeWorkflowLefolab:
         Start a log file
         """
 
-        # Make project directories (necessary even if loading an existing project because this workflow saves a new project based on the old one, leaving the old one intact
-        if not os.path.exists(self.cfg["output_path"]):
-            os.makedirs(self.cfg["output_path"])
-        if not os.path.exists(self.cfg["project_path"]):
-            os.makedirs(self.cfg["project_path"])
+        # Ensure output path exists
+        os.makedirs(self.cfg["output_path"], exist_ok=True)
+
+        # Ensure project path exists and use a temp directory if not provided
+        if not self.cfg.get("project_path"):
+            self.temp_dir = tempfile.TemporaryDirectory(prefix="metashape_project_")
+            self.cfg["project_path"] = self.temp_dir.name
+        else:
+            os.makedirs(self.cfg["project_path"], exist_ok=True)
 
         ### Set a filename template for project files and output files based on the 'run_name' key of the config YML
         ## BUT if the value for run_name is "from_config_filename", then use the config filename for the run name.
@@ -216,13 +225,14 @@ class MetashapeWorkflowLefolab:
         ## Project file example to make: "projectID_YYYYMMDDtHHMM-jobID.psx"
         timestamp = stamp_time()
         self.run_id = run_name
+        self.run_id_with_time = "_".join([run_name, timestamp])
         # TODO: If there is a slurm JobID, append to time (separated with "-", not "_"). This will keep jobs initiated in the same minute distinct
 
         project_file = os.path.join(
-            self.cfg["project_path"], ".".join([self.run_id, "psx"])
+            self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"])
         )
         self.log_file = os.path.join(
-            self.cfg["project_path"], ".".join([self.run_id + "_log", "txt"])
+            self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"])
         )
 
         """
@@ -335,10 +345,10 @@ class MetashapeWorkflowLefolab:
         have been produced from the primary set of photos.
         """
 
-        if secondary:
-            photo_paths = self.cfg["photo_path_secondary"]
-        else:
-            photo_paths = self.cfg["photo_path"]
+        # if secondary:
+        #     photo_paths = self.cfg["photo_path_secondary"]
+        # else:
+        photo_paths = self.cfg["photo_path"]
 
         # If it's a single string (i.e. one directory), make it a list of one string so we can iterate
         # over it the same as if it were a list of strings
@@ -858,7 +868,7 @@ class MetashapeWorkflowLefolab:
 
         ### Export points
 
-        if self.cfg["buildPointCloud"]["export"]:
+        if self.cfg["buildPointCloud"]["export"] and self.cfg["HighDis"]["enabled"] == False:
 
             output_file = os.path.join(
                 self.cfg["output_path"], self.run_id + "_pg.copc.laz"
@@ -1010,7 +1020,7 @@ class MetashapeWorkflowLefolab:
                 output_file = os.path.join(
                     self.cfg["output_path"], self.run_id + "_dsm.tif"
                 )
-                if self.cfg["buildDem"]["export"]:
+                if self.cfg["buildDem"]["export"] and self.cfg["HighDis"]["enabled"] == False:
                     self.doc.chunk.exportRaster(
                         path=output_file,
                         projection=projection,
@@ -1289,53 +1299,51 @@ class MetashapeWorkflowLefolab:
         Build end export DEM
         """
 
+        # prepping params for buildDem
+        projection = Metashape.OrthoProjection()
+        projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
 
-        if self.cfg["buildDemHighDis"]["enabled"]:
-            # prepping params for buildDem
-            projection = Metashape.OrthoProjection()
-            projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
+        # prepping params for export
+        compression = Metashape.ImageCompression()
+        compression.tiff_big = self.cfg["buildDemHighDis"]["tiff_big"]
+        compression.tiff_tiled = self.cfg["buildDemHighDis"]["tiff_tiled"]
+        compression.tiff_overviews = self.cfg["buildDemHighDis"]["tiff_overviews"]
+        compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
 
-            # prepping params for export
-            compression = Metashape.ImageCompression()
-            compression.tiff_big = self.cfg["buildDemHighDis"]["tiff_big"]
-            compression.tiff_tiled = self.cfg["buildDemHighDis"]["tiff_tiled"]
-            compression.tiff_overviews = self.cfg["buildDemHighDis"]["tiff_overviews"]
-            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+        if "DSM-ptcloud" in self.cfg["buildDemHighDis"]["surface"]:
+            start_time = time.time()
 
-            if "DSM-ptcloud" in self.cfg["buildDemHighDis"]["surface"]:
-                start_time = time.time()
+            # call without point classes argument (Metashape then defaults to all classes)
+            self.doc.chunk.buildDem(
+                source_data=Metashape.PointCloudData,
+                subdivide_task=self.cfg["subdivide_task"],
+                projection=projection,
+                resolution=self.cfg["buildDemHighDis"]["resolution"],
+                replace_asset=True,
+            )
 
-                # call without point classes argument (Metashape then defaults to all classes)
-                self.doc.chunk.buildDem(
-                    source_data=Metashape.PointCloudData,
-                    subdivide_task=self.cfg["subdivide_task"],
+            time_taken = diff_time(time.time(), start_time)
+
+            self.doc.chunk.elevation.label = "DSM-ptcloud"
+
+            # record results to file
+            with open(self.log_file, "a") as file:
+                file.write(
+                    MetashapeWorkflowLefolab.sep.join(["Build DSM-ptcloud", time_taken])
+                    + "\n"
+                )
+
+            output_file = os.path.join(
+                self.cfg["output_path"], self.run_id + "_dsm.tif"
+            )
+            if self.cfg["buildDemHighDis"]["export"]:
+                self.doc.chunk.exportRaster(
+                    path=output_file,
                     projection=projection,
-                    resolution=self.cfg["buildDemHighDis"]["resolution"],
-                    replace_asset=True,
+                    nodata_value=self.cfg["buildDemHighDis"]["nodata"],
+                    source_data=Metashape.ElevationData,
+                    image_compression=compression,
                 )
-
-                time_taken = diff_time(time.time(), start_time)
-
-                self.doc.chunk.elevation.label = "DSM-ptcloud"
-
-                # record results to file
-                with open(self.log_file, "a") as file:
-                    file.write(
-                        MetashapeWorkflowLefolab.sep.join(["Build DSM-ptcloud", time_taken])
-                        + "\n"
-                    )
-
-                output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_dsm.tif"
-                )
-                if self.cfg["buildDemHighDis"]["export"]:
-                    self.doc.chunk.exportRaster(
-                        path=output_file,
-                        projection=projection,
-                        nodata_value=self.cfg["buildDemHighDis"]["nodata"],
-                        source_data=Metashape.ElevationData,
-                        image_compression=compression,
-                    )
 
             # if "DTM-ptcloud" in self.cfg["buildDemHighDis"]["surface"]:
 
@@ -1519,5 +1527,9 @@ class MetashapeWorkflowLefolab:
             file.write("\n\n### CONFIGURATION ###\n")
             documents = yaml.dump(config_full, file, default_flow_style=False)
             file.write("### END CONFIGURATION ###\n")
+
+        # Cleanup temp directory if it was created
+        if self.cfg.get("keep_project") == False and hasattr(self, "temp_dir"):
+            self.temp_dir.cleanup()
 
         return True
