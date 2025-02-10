@@ -7,12 +7,14 @@
 # Adapted by Antoine Caron-Guay, for Lefolab, 2025
 
 import argparse
+import os
 import sys
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
 
 ## Define where to get the config file
-default_config_file = "config/config_lefolab_default.yml"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+default_config_file = os.path.join(script_dir, "..", "config", "config_lefolab_default.yml")
 
 
 # Load custom modules and config file: slightly different depending whether running interactively or via command line
