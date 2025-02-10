@@ -115,11 +115,11 @@ class MetashapeWorkflowLefolab:
         if override_dict.get("highdis_disabled") is True:
             self.cfg["HighDis"]["enabled"] = False
 
-        # Since the CLI parser has nargs="+" for the photo_path, it will always be a list of values
+        # Since the CLI parser has nargs="+" for the images_path, it will always be a list of values
         # even if only one is provided. To match the format of the yaml parser, if only one value
         # is provided, transform from a list of length one to just the value in that list
-        if "photo_path" in override_dict and len(override_dict["photo_path"]) == 1:
-            override_dict["photo_path"] = override_dict["photo_path"][0]
+        if "images_path" in override_dict and len(override_dict["images_path"]) == 1:
+            override_dict["images_path"] = override_dict["images_path"][0]
 
         # Update any of the fields in the override dict to that value
         self.cfg.update(override_dict)
@@ -134,7 +134,7 @@ class MetashapeWorkflowLefolab:
 
         self.enable_and_log_gpu()
 
-        if (self.cfg["photo_path"] != "") and (
+        if (self.cfg["images_path"] != "") and (
             self.cfg["addPhotos"]["enabled"]
         ):  # only add photos if there is a photo directory listed
             self.add_photos()
@@ -177,7 +177,7 @@ class MetashapeWorkflowLefolab:
         # For this step, the check for whether it is enabled in the config happens inside the function, because there are two steps (DEM and ortho), each of which can be enabled independently
         self.build_dem_orthomosaic()
 
-        # if self.cfg["photo_path_secondary"] != "":
+        # if self.cfg["images_path_secondary"] != "":
         #     self.add_align_secondary_photos()
 
             # if self.cfg["exportCameras"]["enabled"]:
@@ -346,22 +346,22 @@ class MetashapeWorkflowLefolab:
         """
 
         # if secondary:
-        #     photo_paths = self.cfg["photo_path_secondary"]
+        #     images_paths = self.cfg["images_path_secondary"]
         # else:
-        photo_paths = self.cfg["photo_path"]
+        images_paths = self.cfg["images_path"]
 
         # If it's a single string (i.e. one directory), make it a list of one string so we can iterate
         # over it the same as if it were a list of strings
-        if isinstance(photo_paths, str):
-            photo_paths = [photo_paths]
+        if isinstance(images_paths, str):
+            images_paths = [images_paths]
 
-        for photo_path in photo_paths:
+        for images_path in images_paths:
 
             grp = self.doc.chunk.addCameraGroup()
 
             ## Get paths to all the project photos
             a = glob.iglob(
-                os.path.join(photo_path, "**", "*.*"), recursive=True
+                os.path.join(images_path, "**", "*.*"), recursive=True
             )  # (([jJ][pP][gG])|([tT][iI][fF]))
             b = [path for path in a]
             photo_files = [
@@ -456,7 +456,7 @@ class MetashapeWorkflowLefolab:
     #     self.doc.chunk.locateReflectancePanels()
     #     self.doc.chunk.loadReflectancePanelCalibration(
     #         os.path.join(
-    #             self.cfg["photo_path"],
+    #             self.cfg["images_path"],
     #             "calibration",
     #             self.cfg["calibrateReflectance"]["panel_filename"],
     #         )
@@ -489,18 +489,18 @@ class MetashapeWorkflowLefolab:
         # folders of input images:
         # https://github.com/open-forest-observatory/automate-metashape-2/issues/49.
 
-        photo_paths = self.cfg["photo_path"]
+        images_paths = self.cfg["images_path"]
 
         # If it's a single string (i.e. one directory), make it a list of one string so we can take the
         # first element using the same operation we would use on a list of strings
-        if isinstance(photo_paths, str):
-            photo_paths = [photo_paths]
+        if isinstance(images_paths, str):
+            images_paths = [images_paths]
 
         # Take the first folder and assume it's the one with the GCPs file
-        photo_path = photo_paths[0]
+        images_path = images_paths[0]
 
         ## Tag specific pixels in specific images where GCPs are located
-        path = os.path.join(photo_path, "gcps", "prepared", "gcp_imagecoords_table.csv")
+        path = os.path.join(images_path, "gcps", "prepared", "gcp_imagecoords_table.csv")
         file = open(path)
         content = file.read().splitlines()
 
@@ -523,7 +523,7 @@ class MetashapeWorkflowLefolab:
                 marker.label = marker_label
 
             # Prepend the image path to the GCP's camera label to make it an absolute path
-            camera_label = os.path.join(photo_path, camera_label)
+            camera_label = os.path.join(images_path, camera_label)
 
             camera = get_camera(self.doc.chunk, camera_label)
             if not camera:
@@ -535,7 +535,7 @@ class MetashapeWorkflowLefolab:
             )
 
         ## Assign real-world coordinates to each GCP
-        path = os.path.join(photo_path, "gcps", "prepared", "gcp_table.csv")
+        path = os.path.join(images_path, "gcps", "prepared", "gcp_table.csv")
 
         file = open(path)
         content = file.read().splitlines()
