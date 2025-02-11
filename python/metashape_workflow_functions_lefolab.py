@@ -448,12 +448,14 @@ class MetashapeWorkflowLefolab:
                     )
 
         if self.cfg["camera_calibration_path"] != "":
-            calibration = Metashape.Calibration()
-            calibration.load(self.cfg["camera_calibration_path"], 
-                             format=self.cfg["camera_calibration_format"])
+            sensor = self.doc.chunk.sensors[0]
+            calib = Metashape.Calibration()
 
-            for sensor in self.doc.chunk.sensors:
-                sensor.calibration = calibration
+            calib.load(self.cfg["camera_calibration_path"],
+                       format=self.cfg["cameracalibration"]["format"]))
+            sensor.user_calib = calib
+            
+            sensor.fixed_params=self.cfg["cameracalibration"]["fixed_parameters"]
 
         self.doc.save()
 

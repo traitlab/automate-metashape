@@ -73,7 +73,9 @@ addPhotos: # (Metashape: addPhotos)
 #     use_sun_sensor: True
 
 camera_calibration_path: "" # Path to camera calibration file. If not provided, Metashape will ignore this step.
-camera_calibration_format: Metashape.CalibrationFormatXML # Options: CalibrationFormatXML, CalibrationFormatPix4D, CalibrationFormatOpenCV, etc.
+cameracalibration:
+    format: Metashape.CalibrationFormatXML # Options: CalibrationFormatXML, CalibrationFormatPix4D, CalibrationFormatOpenCV, etc.
+    fixed_parameters: "" # Parameters to fix, provided as a list. ex: ["F","Cx","Cy","K1","K2","K3","P1","P2"]. If empty, no parameters fixed.
 
 alignPhotos: # (Metashape: matchPhotos, alignCameras)
     enabled: True
