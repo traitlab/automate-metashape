@@ -452,7 +452,7 @@ class MetashapeWorkflowLefolab:
             calib = Metashape.Calibration()
 
             calib.load(self.cfg["camera_calibration_path"],
-                       format=self.cfg["cameracalibration"]["format"]))
+                       format=self.cfg["cameracalibration"]["format"])
             sensor.user_calib = calib
             
             sensor.fixed_params=self.cfg["cameracalibration"]["fixed_parameters"]
