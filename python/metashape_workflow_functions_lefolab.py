@@ -412,40 +412,40 @@ class MetashapeWorkflowLefolab:
             # Remove the first (deafult) sensor, which should no longer be assigned to any photos
             self.doc.chunk.remove(self.doc.chunk.sensors[0])
 
-        ## If specified, change the accuracy of the cameras to match the RTK flag (RTK fix if flag = 50, otherwise no fix
-        if self.cfg["addPhotos"]["use_rtk"]:
-            for cam in self.doc.chunk.cameras:
-                rtkflag = cam.photo.meta["DJI/RtkFlag"]
-                if rtkflag != "50":
-                    # cam.reference.location_accuracy = Metashape.Vector(
-                    #     [
-                    #         self.cfg["addPhotos"]["fix_accuracy"],
-                    #         self.cfg["addPhotos"]["fix_accuracy"],
-                    #         self.cfg["addPhotos"]["fix_accuracy"],
-                    #     ]
-                    # )
-                    # cam.reference.accuracy = Metashape.Vector(
-                    #     [
-                    #         self.cfg["addPhotos"]["fix_accuracy"],
-                    #         self.cfg["addPhotos"]["fix_accuracy"],
-                    #         self.cfg["addPhotos"]["fix_accuracy"],
-                    #     ]
-                    # )
-                # else:
-                    cam.reference.location_accuracy = Metashape.Vector(
-                        [
-                            self.cfg["addPhotos"]["nofix_accuracy"],
-                            self.cfg["addPhotos"]["nofix_accuracy"],
-                            self.cfg["addPhotos"]["nofix_accuracy"],
-                        ]
-                    )
-                    cam.reference.accuracy = Metashape.Vector(
-                        [
-                            self.cfg["addPhotos"]["nofix_accuracy"],
-                            self.cfg["addPhotos"]["nofix_accuracy"],
-                            self.cfg["addPhotos"]["nofix_accuracy"],
-                        ]
-                    )
+        # ## If specified, change the accuracy of the cameras to match the RTK flag (RTK fix if flag = 50, otherwise no fix
+        # if self.cfg["addPhotos"]["use_rtk"]:
+        #     for cam in self.doc.chunk.cameras:
+        #         rtkflag = cam.photo.meta["DJI/RtkFlag"]
+        #         if rtkflag != "50":
+        #             cam.reference.location_accuracy = Metashape.Vector(
+        #                 [
+        #                     self.cfg["addPhotos"]["fix_accuracy"],
+        #                     self.cfg["addPhotos"]["fix_accuracy"],
+        #                     self.cfg["addPhotos"]["fix_accuracy"],
+        #                 ]
+        #             )
+        #             cam.reference.accuracy = Metashape.Vector(
+        #                 [
+        #                     self.cfg["addPhotos"]["fix_accuracy"],
+        #                     self.cfg["addPhotos"]["fix_accuracy"],
+        #                     self.cfg["addPhotos"]["fix_accuracy"],
+        #                 ]
+        #             )
+        #         else:
+        #             cam.reference.location_accuracy = Metashape.Vector(
+        #                 [
+        #                     self.cfg["addPhotos"]["nofix_accuracy"],
+        #                     self.cfg["addPhotos"]["nofix_accuracy"],
+        #                     self.cfg["addPhotos"]["nofix_accuracy"],
+        #                 ]
+        #             )
+        #             cam.reference.accuracy = Metashape.Vector(
+        #                 [
+        #                     self.cfg["addPhotos"]["nofix_accuracy"],
+        #                     self.cfg["addPhotos"]["nofix_accuracy"],
+        #                     self.cfg["addPhotos"]["nofix_accuracy"],
+        #                 ]
+        #             )
 
         if self.cfg["camera_calibration_path"] != "":
             sensor = self.doc.chunk.sensors[0]

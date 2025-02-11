@@ -59,7 +59,7 @@ addPhotos: # (Metashape: addPhotos)
   multispectral: False # Is this a multispectral photo set? If RGB, set to False.
   use_rtk: True # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the nofix accuracy.
   # fix_accuracy: 3 # Accuracy to set for photos that have a RTK fix, in units of the CRS
-  nofix_accuracy: 5 # Accuracy to set for photos that have no fix, in units of the CRS
+  # nofix_accuracy: 5 # Accuracy to set for photos that have no fix, in units of the CRS
   load_reference: True
   load_xmp_calibration: True
   load_xmp_orientation: True
