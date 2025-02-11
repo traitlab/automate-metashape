@@ -50,7 +50,7 @@ def parse_args():
         + "Will be created if does not exist.",
     )
     parser.add_argument(
-        "-r",
+        "-run",
         "--run-name",
         help="The identifier for the run. Will be used in naming output files.",
     )
