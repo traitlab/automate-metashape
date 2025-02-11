@@ -30,7 +30,7 @@ def parse_args():
         "-c",
         "--config_file",
         default=default_config_file,
-        help="A path to a yaml config file."
+        help="Path to a yaml config file."
     )
     parser.add_argument(
         "-i",
@@ -60,6 +60,11 @@ def parse_args():
         help="CRS EPSG code that project outputs should be in "
         + "(projection should be in meter units and intended for the project area). "
         + "It should be specified in the following format: 'EPSG::<EPSG code>'.",
+    )
+    parser.add_argument(
+        "-cam",
+        "--camera-calibration-path",
+        help="Path to a camera calibration file (.xml).",
     )
     parser.add_argument(
         "--highdis-disabled",
