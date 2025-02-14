@@ -57,7 +57,8 @@ addPhotos: # (Metashape: addPhotos)
   enabled: True # This applies to the main photos specified in photo_path above. Secondary photos are always added and aligned if a path (or paths) is provided.
   separate_calibration_per_path: False # If True, each photo path (i.e. each element in the list supplied to 'photo_path' above) will be calibrated independently. Regardless whether True or False, separate camera *models* are calibrated separately; if True, identical camera *models* are calibrated separately if they are provided as separate paths. This addresses the case where two different instances of the same camera model are used in the same project. Note that when True, the logic for assigning separate calibration to each path assumes that the same camera is used for all photos in the path.
   multispectral: False # Is this a multispectral photo set? If RGB, set to False.
-  use_rtk: True # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the nofix accuracy.
+  use_xmp_accuracy: True # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the nofix accuracy.
+  photos_accuracy: 5 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
   # fix_accuracy: 3 # Accuracy to set for photos that have a RTK fix, in units of the CRS
   # nofix_accuracy: 5 # Accuracy to set for photos that have no fix, in units of the CRS
   load_reference: True
