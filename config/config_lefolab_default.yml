@@ -109,7 +109,6 @@ buildPointCloud: # (Metashape: buildPointCloud and exportPoints)
 buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaster)
     enabled: True
     classify_ground_points: False # Should ground points be classified as part of this step? Note that an alternative is to calculate them as a part of buildPointCloud (above)
-    surface: ["DSM-ptcloud"] # Options: "DTM-ptcloud", "DSM-ptcloud", and/or "DSM-mesh". Type of DEM to export and data to build it from (digital terrain model or digital surface model, and from point cloud or mesh)
     resolution: 0 # DSM resolution. Only affects DSM built using the mesh (other DSM types are set by Metashape and not customizable). Note that this also sets the resolution of the orthomosaic built from this DSM, which is 1/4 of the DSM resolution. If using a mesh-derived DSM, and you also desire an orthomosaic with maximal detail, set the DEM resolution to 4x your GSD. Set to 0 to use Metashape-determined default.
     export: True # Whether to export DEM(s)
     tiff_big: True # Use BigTIFF format? Required for larger projects with large DEMs
@@ -119,7 +118,6 @@ buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaste
 
 buildOrthomosaic: # (Metashape: buildOrthomosaic, exportRaster)
     enabled: True
-    surface: ["DSM-ptcloud"] # Options: "DTM-ptcloud", "DSM-ptcloud", "DSM-mesh", and/or "Mesh". The surface to build the orthomosaic onto. DTM and DSM refer to elevation models built by Metashape and must be configured to be computed via buildDem, above. Mesh refers to using the mesh model directly rather than first computing a DEM.
     blending: Metashape.MosaicBlending # Photo blending mode. Options include AverageBlending, MosaicBlending, MinBlending, MaxBlending, DisabledBlending
     fill_holes: True # Fill holes in orthomosaic where no photo data exist by interpolating?
     refine_seamlines: False # Use smart algorithm to identify photo seamlines where they will least distort.
@@ -149,7 +147,6 @@ buildPointCloudHighDis: # (Metashape: buildPointCloud, (optionally) classifyGrou
 
 buildDemHighDis: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaster)
     classify_ground_points: False # Should ground points be classified as part of this step? Note that an alternative is to calculate them as a part of buildPointCloud (above)
-    surface: ["DSM-ptcloud"] # Options: "DTM-ptcloud", "DSM-ptcloud", and/or "DSM-mesh". Type of DEM to export and data to build it from (digital terrain model or digital surface model, and from point cloud or mesh)
     resolution: 0 # DSM resolution. Only affects DSM built using the mesh (other DSM types are set by Metashape and not customizable). Note that this also sets the resolution of the orthomosaic built from this DSM, which is 1/4 of the DSM resolution. If using a mesh-derived DSM, and you also desire an orthomosaic with maximal detail, set the DEM resolution to 4x your GSD. Set to 0 to use Metashape-determined default.
     export: True # Whether to export DEM(s)
     tiff_big: True # Use BigTIFF format? Required for larger projects with large DEMs
