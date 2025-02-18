@@ -92,7 +92,7 @@ optimizeCameras: # (Metashape: optimizeCameras)
 
 buildDepthMaps: # (Metashape: buildDepthMaps)
     enabled: True
-    downscale: 8 # How much to coarsen the photos when searching for matches to build the point cloud. For large photosets, values < 4 likely take prohibitively long. (1 - Ultra high, 2 - High, 4 - Medium, 8 - Low, 16 - Lowest) (https://www.agisoft.com/forum/index.php?topic=11697.0).
+    downscale: 4 # How much to coarsen the photos when searching for matches to build the point cloud. For large photosets, values < 4 likely take prohibitively long. (1 - Ultra high, 2 - High, 4 - Medium, 8 - Low, 16 - Lowest) (https://www.agisoft.com/forum/index.php?topic=11697.0).
     filter_mode: Metashape.AggressiveFiltering # How to filter the depth map. Options are NoFiltering, MildFiltering, ModerateFiltering, AggressiveFiltering. Aggressive filtering removes detail and makes worse DEMs (at least for forest). NoFiltering takes very long. In trials, it never completed.
     reuse_depth: False # Purpose unknown.
     max_neighbors: 16 # Maximum number of neighboring photos to use for estimating depth map. Higher numbers may increase accuracy but dramatically increase processing time.
