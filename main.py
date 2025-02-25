@@ -14,15 +14,9 @@ import sys
 
 ## Define where to get the config file
 script_dir = os.path.dirname(os.path.abspath(__file__))
-default_config_file = os.path.join(script_dir, "..", "config", "config_lefolab_default.yml")
+default_config_file = os.path.join(script_dir, "config", "config_lefolab_default.yml")
 
-
-# Load custom modules and config file: slightly different depending whether running interactively or via command line
-try:  # running interactively (in linux) or command line (windows)
-    from python.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
-except:  # running from command line (in linux) or interactively (windows)
-    from metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
-
+from python.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
 
 def parse_args():
     parser = argparse.ArgumentParser()
