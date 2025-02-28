@@ -34,13 +34,15 @@ def parse_args():
     parser.add_argument(
         "-p",
         "--project-path",
-        help="Path to save Metashape project file (.psx). Will be created if does not exist.",
+        help="Path to save Metashape project file (.psx). Will be created if does not exist."
+        + "Default to 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>.psx'.",
     )
     parser.add_argument(
         "-o",
         "--output-path",
         help="Path for exports (e.g., cloudpoint, DSM, orthomosaic) "
-        + "Will be created if does not exist.",
+        + "Will be created if does not exist."
+        + "Default to 'conrad/labolaliberte_upload/metashape/<yyyy>/<missionid>/'.",
     )
     parser.add_argument(
         "-id",
@@ -72,17 +74,25 @@ def parse_args():
     )
 
     args = parser.parse_args()
+
+    # Assign default paths if not provided
+    if args.mission_id:
+        # Extract year from the mission_id (first 4 characters)
+        mission_year = args.mission_id[:4]
+
+        if args.project_path is None:
+            args.project_path = f"conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}.psx"
+        if args.output_path is None:
+            args.output_path = f"conrad/labolaliberte_upload/metashape/{mission_year}/{args.mission_id}/"
+
     return args
 
-
 args = parse_args()
-
 
 # Check if required parameters are provided or appropriate config file is used
 required_params = {
     "images_path": "Error: No images path provided. Please specify --images-path or use an appropriate config file.",
-    "output_path": "Error: No output path provided. Please specify --output-path or use an appropriate config file.",
-    "run_name": "Error: No run name provided. Please specify --run-name or use an appropriate config file.",
+    "mission_id": "Error: No run name provided. Please specify --mission-id or use an appropriate config file.",
     "project_crs": "Error: No project CRS provided. Please specify --project-crs or use an appropriate config file."
 }
 
@@ -90,14 +100,6 @@ if args.config_file == default_config_file:
     for param, error_message in required_params.items():
         if getattr(args, param) is None:
             raise ValueError(error_message)
-
-# Check if --keep-project is True and either --project-path or --config-file is missing
-if (args.keep_project and (args.config_file != default_config_file or args.project_path is not None)):
-    pass
-elif not args.keep_project:
-    pass
-else:
-    raise ValueError("Error: --keep-project is set, but no project path or config file was provided.")
 
 # Initialize the workflow instance with the configuration file and the dictionary representation of CLI overrides
 meta = MetashapeWorkflowLefolab(config_file=args.config_file, override_dict=args.__dict__)
