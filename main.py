@@ -8,14 +8,14 @@
 
 import argparse
 import os
+import re
+from python.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
 
 # Define where to get the config file
 script_dir = os.path.dirname(os.path.abspath(__file__))
 default_config_file = os.path.join(script_dir, "config", "config_lefolab_default.yml")
-
-from python.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -48,7 +48,8 @@ def parse_args():
         "-id",
         "--mission-id",
         help="The identifier for the run. Will be used in naming output files."
-        + "It should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'.",
+        + "It should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'."
+        + "If not provided, it will be extracted from the images path.",
     )
     parser.add_argument(
         "-crs",
@@ -77,15 +78,27 @@ def parse_args():
 
     args = parser.parse_args()
 
-    # Assign default paths if not provided
-    if args.mission_id:
-        # Extract year from the mission_id (first 4 characters)
-        mission_year = args.mission_id[:4]
+    # Extract the last part of the images path to use as mission_id if not provided
+    if args.mission_id is None and args.images_path and len(args.images_path) == 1:
+        images_path = args.images_path[0]
+        mission_id = os.path.basename(os.path.normpath(images_path))
+        # Validate mission_id format
+        mission_id_pattern = r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$"
+        if not re.match(mission_id_pattern, mission_id):
+            raise ValueError(
+                f"Invalid mission_id format from images path: {mission_id}. "
+                "The mission_id should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'. "
+                "Please specify a valid --mission-id."
+            )
+        args.mission_id = mission_id
 
-        if args.project_path is None:
-            args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
-        if args.output_path is None:
-            args.output_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
+    # Extract year from the mission_id (first 4 characters)
+    mission_year = args.mission_id[:4]
+    # Assign default paths if not provided
+    if args.project_path is None:
+        args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
+    if args.output_path is None:
+        args.output_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
 
     return args
 

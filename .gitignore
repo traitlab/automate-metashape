@@ -124,3 +124,4 @@ dev/
 
 ## Mac system file
 .DS_Store
+/.venv
