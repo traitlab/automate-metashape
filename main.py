@@ -8,11 +8,10 @@
 
 import argparse
 import os
-import sys
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
 
-## Define where to get the config file
+# Define where to get the config file
 script_dir = os.path.dirname(os.path.abspath(__file__))
 default_config_file = os.path.join(script_dir, "config", "config_lefolab_default.yml")
 
@@ -53,7 +52,7 @@ def parse_args():
         "--project-crs",
         help="CRS EPSG code that project outputs should be in "
         + "(projection should be in meter units and intended for the project area). "
-        + "It should be specified in the following format: 'EPSG::<EPSG code>'.",
+        + "It should be in the format: 'EPSG::<EPSG code>'.",
     )
     parser.add_argument(
         "-cam",

@@ -12,10 +12,10 @@ load_project: ""
 # If there are no photos to add (e.g., this is an existing project that already has photos in it, set to an empty string ("")
 photo_path: ""
 
-# Path for exports (e.g., points, DSM, orthomosaic) and processing log. Will be created if does not exist.
+# Path for exports (e.g., points, DSM, orthomosaic). Will be created if does not exist.
 output_path: ""
 
-# Path to save Metashape project file (.psx). Will be created if does not exist
+# Path to save Metashape project file (.psx) and processing log. Will be created if does not exist
 project_path: ""
 keep_project: False # Should the Metashape project file be kept after processing? If False, it will be deleted after processing.
 
