@@ -17,7 +17,7 @@ output_path: ""
 
 # Path to save Metashape project file (.psx) and processing log. Will be created if does not exist
 project_path: ""
-keep_project: False # Should the Metashape project file be kept after processing? If False, it will be deleted after processing.
+delete_project: False # Should the Metashape project file be kept after processing? If True, it will be deleted after processing.
 
 # The identifier for the run. Will be used in naming output files. It should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'.
 # Optionally, set it to an empty string ("") to use the config file name (minus extension) as the run name

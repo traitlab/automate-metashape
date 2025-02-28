@@ -11,6 +11,7 @@ import time
 
 ### Import the Metashape functionality
 import Metashape
+import shutil
 import yaml
 
 
@@ -204,12 +205,8 @@ class MetashapeWorkflowLefolab:
         # Ensure output path exists
         os.makedirs(self.cfg["output_path"], exist_ok=True)
 
-        # Ensure project path exists and use a temp directory if not provided
-        if not self.cfg.get("project_path"):
-            self.temp_dir = tempfile.TemporaryDirectory(prefix="metashape_project_")
-            self.cfg["project_path"] = self.temp_dir.name
-        else:
-            os.makedirs(self.cfg["project_path"], exist_ok=True)
+        # Ensure project path exists
+        os.makedirs(self.cfg["project_path"], exist_ok=True)
 
         ### Set a filename template for project files and output files based on the 'mission_id' key of the config YML
         ## BUT if the value for mission_id is "from_config_filename", then use the config filename for the run name.
@@ -1507,8 +1504,8 @@ class MetashapeWorkflowLefolab:
             documents = yaml.dump(config_full, file, default_flow_style=False)
             file.write("### END CONFIGURATION ###\n")
 
-        # Cleanup temp directory if it was created
-        if self.cfg.get("keep_project") == False and hasattr(self, "temp_dir"):
-            self.temp_dir.cleanup()
+        # Cleanup project files if specified
+        if self.cfg.get("delete_project") == True:
+            shutil.rmtree(self.cfg["project_path"])
 
         return True

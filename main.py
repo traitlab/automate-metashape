@@ -70,9 +70,9 @@ def parse_args():
         + "By default, High quality and Disable filtering options are enabled.",
     )
     parser.add_argument(
-        "--keep-project",
+        "--delete-project",
         action="store_true",
-        help="Keep project file after processing. Deleted by default.",
+        help="Delete project file after processing. Kept by default.",
     )
 
     args = parser.parse_args()
