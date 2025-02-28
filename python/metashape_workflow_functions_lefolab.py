@@ -1506,6 +1506,7 @@ class MetashapeWorkflowLefolab:
 
         # Cleanup project files if specified
         if self.cfg.get("delete_project") == True:
+            del self.doc  # Close the Metashape project and remove the lock file
             shutil.rmtree(self.cfg["project_path"])
 
         return True
