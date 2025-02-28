@@ -43,9 +43,10 @@ def parse_args():
         + "Will be created if does not exist.",
     )
     parser.add_argument(
-        "-run",
-        "--run-name",
-        help="The identifier for the run. Will be used in naming output files.",
+        "-id",
+        "--mission-id",
+        help="The identifier for the run. Will be used in naming output files."
+        + "It should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'.",
     )
     parser.add_argument(
         "-crs",

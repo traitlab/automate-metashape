@@ -32,7 +32,7 @@ def convert_objects(a_dict):
                     and not ("path" in k)
                     and not ("project" in k)
                     and not ("name" in k)
-                ):  # allow "path" and "project" and "name" keys (e.g. "photoset_path" and "run_name") from YAML to include "Metashape" (e.g., Metashape in the filename)
+                ):  # allow "path" and "project" and "name" keys (e.g. "photoset_path" and "mission_id") from YAML to include "Metashape" (e.g., Metashape in the filename)
                     a_dict[k] = eval(v)
             elif isinstance(v, list):
                 # skip if no item in list have metashape, else convert string to metashape object
@@ -211,21 +211,21 @@ class MetashapeWorkflowLefolab:
         else:
             os.makedirs(self.cfg["project_path"], exist_ok=True)
 
-        ### Set a filename template for project files and output files based on the 'run_name' key of the config YML
-        ## BUT if the value for run_name is "from_config_filename", then use the config filename for the run name.
+        ### Set a filename template for project files and output files based on the 'mission_id' key of the config YML
+        ## BUT if the value for mission_id is "from_config_filename", then use the config filename for the run name.
 
-        run_name = self.cfg["run_name"]
+        mission_id = self.cfg["mission_id"]
 
-        if run_name == "from_config_filename" or run_name == "":
+        if mission_id == "from_config_filename" or mission_id == "":
             file_basename = os.path.basename(
                 self.config_file
             )  # extracts file base name from path
-            run_name, _ = os.path.splitext(file_basename)  # removes extension
+            mission_id, _ = os.path.splitext(file_basename)  # removes extension
 
         ## Project file example to make: "projectID_YYYYMMDDtHHMM-jobID.psx"
         timestamp = stamp_time()
-        self.run_id = run_name
-        self.run_id_with_time = "_".join([run_name, timestamp])
+        self.run_id = mission_id
+        self.run_id_with_time = "_".join([mission_id, timestamp])
         # TODO: If there is a slurm JobID, append to time (separated with "-", not "_"). This will keep jobs initiated in the same minute distinct
 
         project_file = os.path.join(
