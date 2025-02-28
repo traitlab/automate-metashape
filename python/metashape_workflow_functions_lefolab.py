@@ -116,12 +116,6 @@ class MetashapeWorkflowLefolab:
         if override_dict.get("quick_process") is True:
             self.cfg["HighDis"]["enabled"] = False
 
-        # Since the CLI parser has nargs="+" for the images_path, it will always be a list of values
-        # even if only one is provided. To match the format of the yaml parser, if only one value
-        # is provided, transform from a list of length one to just the value in that list
-        if "images_path" in override_dict and len(override_dict["images_path"]) == 1:
-            override_dict["images_path"] = override_dict["images_path"][0]
-
         # Update any of the fields in the override dict to that value
         self.cfg.update(override_dict)
 

@@ -28,8 +28,7 @@ def parse_args():
     parser.add_argument(
         "-i",
         "--images-path",
-        nargs="+",
-        help="One or more absolute paths to load photos from, separated by spaces.",
+        help="Path to load photos from.",
     )
     parser.add_argument(
         "-p",
@@ -79,8 +78,8 @@ def parse_args():
     args = parser.parse_args()
 
     # Extract the last part of the images path to use as mission_id if not provided
-    if args.mission_id is None and args.images_path and len(args.images_path) == 1:
-        images_path = args.images_path[0]
+    if args.mission_id is None and args.images_path:
+        images_path = args.images_path
         mission_id = os.path.basename(os.path.normpath(images_path))
         # Validate mission_id format
         mission_id_pattern = r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$"
