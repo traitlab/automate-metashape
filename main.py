@@ -10,6 +10,7 @@ import argparse
 import os
 import re
 from python.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
+from python.utilis import calculate_median_coordinates, calculate_utm_epsg
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
 
@@ -99,6 +100,12 @@ def parse_args():
         args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
     if args.output_path is None:
         args.output_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
+
+    # Determine project CRS if not provided
+    if args.project_crs is None and args.images_path:
+        # Calculate median coordinates from all images
+        median_latitude, median_longitude = calculate_median_coordinates(args.images_path)
+        args.project_crs = calculate_utm_epsg(median_latitude, median_longitude)
 
     return args
 
