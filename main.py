@@ -34,14 +34,14 @@ def parse_args():
         "-p",
         "--project-path",
         help="Path to save Metashape project file (.psx). Will be created if does not exist."
-        + "Default to 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>/'.",
+        + "If not provided, default to 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>/'.",
     )
     parser.add_argument(
         "-o",
         "--output-path",
         help="Path for exports (e.g., cloudpoint, DSM, orthomosaic) "
         + "Will be created if does not exist."
-        + "Default to 'conrad/labolaliberte_upload/metashape/<yyyy>/<missionid>/'.",
+        + "If not provided, default to 'conrad/labolaliberte_upload/metashape/<yyyy>/<missionid>/'.",
     )
     parser.add_argument(
         "-id",
@@ -55,7 +55,8 @@ def parse_args():
         "--project-crs",
         help="CRS EPSG code that project outputs should be in "
         + "(projection should be in meter units and intended for the project area). "
-        + "It should be in the format: 'EPSG::<EPSG code>'.",
+        + "It should be in the format: 'EPSG::<EPSG code>'."
+        + "If not provided, it will be calculated from the median coordinates of the images.",
     )
     parser.add_argument(
         "-cam",
