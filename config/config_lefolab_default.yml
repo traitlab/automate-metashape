@@ -128,8 +128,8 @@ buildOrthomosaic: # (Metashape: buildOrthomosaic, exportRaster)
     tiff_overviews: True # Include coarse-scale raster data in file for quick display in GIS.
     remove_after_export: False # Remove orthomosaic from project after export to reduce the metashape project file size
 
-HighDis:
-    enabled: True
+HighDis: # High quality and Disable filtering options for second run
+    enabled: True # If False, exports will be from the first run parameters above and skip the second run parameters below (quick process)
 
 buildDepthMapsHighDis: # (Metashape: buildDepthMaps)
     downscale: 2 # How much to coarsen the photos when searching for matches to build the point cloud. For large photosets, values < 4 likely take prohibitively long. (1 - Ultra high, 2 - High, 4 - Medium, 8 - Low, 16 - Lowest) (https://www.agisoft.com/forum/index.php?topic=11697.0).

@@ -63,9 +63,11 @@ def parse_args():
         help="Path to a camera calibration file (.xml).",
     )
     parser.add_argument(
-        "--highdis-disabled",
+        "-quick",
+        "--quick-process",
         action="store_true",
-        help="Disable High quality and No filering (HighDis) processing. Enabled by default.",
+        help="Enable faster processing by disabling High quality and Disable filtering options (HighDis). "
+        + "By default, High quality and Disable filtering options are enabled.",
     )
     parser.add_argument(
         "--keep-project",

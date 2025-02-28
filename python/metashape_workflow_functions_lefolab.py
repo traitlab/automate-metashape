@@ -112,7 +112,7 @@ class MetashapeWorkflowLefolab:
         override_dict = {k: v for k, v in override_dict.items() if v is not None}
 
         # Disable HighDis processing if specified in the CLI
-        if override_dict.get("highdis_disabled") is True:
+        if override_dict.get("quick_process") is True:
             self.cfg["HighDis"]["enabled"] = False
 
         # Since the CLI parser has nargs="+" for the images_path, it will always be a list of values
