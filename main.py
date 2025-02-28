@@ -35,7 +35,7 @@ def parse_args():
         "-p",
         "--project-path",
         help="Path to save Metashape project file (.psx). Will be created if does not exist."
-        + "Default to 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>.psx'.",
+        + "Default to 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>/'.",
     )
     parser.add_argument(
         "-o",
@@ -83,9 +83,9 @@ def parse_args():
         mission_year = args.mission_id[:4]
 
         if args.project_path is None:
-            args.project_path = f"conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}.psx"
+            args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
         if args.output_path is None:
-            args.output_path = f"conrad/labolaliberte_upload/metashape/{mission_year}/{args.mission_id}/"
+            args.output_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
 
     return args
 
