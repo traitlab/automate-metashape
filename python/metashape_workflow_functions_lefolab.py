@@ -92,6 +92,7 @@ class MetashapeWorkflowLefolab:
         Initializes an instance of the MetashapeWorkflowLefolab class based on the config file given
         """
         self.config_file = config_file
+        self.override_dict = override_dict
         self.doc = None
         self.log_file = None
         self.run_id = None
@@ -1490,6 +1491,13 @@ class MetashapeWorkflowLefolab:
         # open run configuration again. We can't just use the existing self.cfg file because its objects had already been converted to Metashape objects (they don't write well)
         with open(self.config_file) as file:
             config_full = yaml.safe_load(file)
+
+        # add values from the override dict
+        override_dict = {k: v for k, v in self.override_dict.items() if v is not None}
+        config_full.update(override_dict)
+
+        if self.override_dict.get("quick_process") is True:
+            config_full["HighDis"]["enabled"] = False
 
         # write the run configuration to the log file
         with open(self.log_file, "a") as file:
