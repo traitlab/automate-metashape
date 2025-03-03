@@ -8,8 +8,8 @@ def calculate_utm_epsg(latitude, longitude):
     hemisphere = '6' if latitude >= 0 else '7'
     return f"EPSG:32{hemisphere}{zone:02d}"
 
-def extract_coordinates_from_image(image_path):
-    """Extract latitude and longitude from the image metadata."""
+def get_coordinates_from_image(image_path):
+    """Get latitude and longitude from the image metadata."""
     with open(image_path, 'rb') as f:
         tags = exifread.process_file(f)
         latitude = tags.get('GPS GPSLatitude')
@@ -41,7 +41,7 @@ def calculate_median_coordinates(images_path):
                 if file.lower().endswith(('.jpg', '.jpeg', '.png', '.tiff')):
                     image_path = os.path.join(root, file)
                     try:
-                        latitude, longitude = extract_coordinates_from_image(image_path)
+                        latitude, longitude = get_coordinates_from_image(image_path)
                         latitudes.append(latitude)
                         longitudes.append(longitude)
                     except Exception as e:
