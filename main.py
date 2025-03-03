@@ -99,7 +99,7 @@ def parse_args():
     if args.project_path is None:
         args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
     if args.output_path is None:
-        args.output_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
+        args.output_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/"
 
     # Determine project CRS if not provided
     if args.project_crs is None and args.images_path:
@@ -107,9 +107,9 @@ def parse_args():
         median_latitude, median_longitude = calculate_median_coordinates(args.images_path)
         args.project_crs = calculate_utm_epsg(median_latitude, median_longitude)
 
-    return args
+    return args, mission_year
 
-args = parse_args()
+args, mission_year = parse_args()
 
 # Check if required parameters are provided or appropriate config file is used
 required_params = {
@@ -128,3 +128,10 @@ meta = MetashapeWorkflowLefolab(config_file=args.config_file, override_dict=args
 
 # Run the Metashape workflow
 meta.run()
+
+# Move the output files to conrad_upload if the output path is the default one
+if args.output_path == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/":
+    source_path = args.output_path
+    destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
+    os.makedirs(destination_path, exist_ok=True)
+    os.system(f"mv {source_path} {destination_path}")
