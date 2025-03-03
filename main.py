@@ -134,4 +134,5 @@ if args.output_path == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{missi
     source_path = args.output_path
     destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
     os.makedirs(destination_path, exist_ok=True)
-    os.system(f"mv {source_path} {destination_path}")
+    os.system(f"mv {source_path}* {destination_path}")
+    print(f"Output files moved to {destination_path}")
