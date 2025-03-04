@@ -57,7 +57,7 @@ def parse_args():
         "--project-crs",
         help="CRS EPSG code that project outputs should be in.\n"
         + "It should be in the format: 'EPSG::<EPSG code>'.\n"
-        + "If not provided, it will be calculated from the median coordinates of the images. (using UTM).",
+        + "If not provided, it will be calculated from the median coordinates of the images (using UTM).",
     )
     parser.add_argument(
         "-cam",
