@@ -9,6 +9,7 @@
 import argparse
 import os
 import re
+from argparse import RawTextHelpFormatter
 from python.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
 from python.utilis import calculate_median_coordinates, calculate_utm_epsg
 
@@ -19,45 +20,44 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 default_config_file = os.path.join(script_dir, "config", "config_lefolab_default.yml")
 
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c",
-        "--config_file",
-        default=default_config_file,
-        help="Path to a yaml config file."
-    )
+    parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     parser.add_argument(
         "-i",
         "--images-path",
         help="Path to load photos from.",
     )
     parser.add_argument(
+        "-c",
+        "--config_file",
+        default=default_config_file,
+        help="Path to a yaml config file.\n"
+        + "If not provided, default to 'config/config_lefolab_default.yml'.",
+    )
+    parser.add_argument(
         "-p",
         "--project-path",
-        help="Path to save Metashape project file (.psx). Will be created if does not exist."
+        help="Path to save Metashape project file (.psx). Will be created if does not exist.\n"
         + "If not provided, default to 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>/'.",
     )
     parser.add_argument(
         "-o",
         "--output-path",
-        help="Path for exports (e.g., cloudpoint, DSM, orthomosaic) "
-        + "Will be created if does not exist."
+        help="Path for exports (e.g., cloudpoint, DSM, orthomosaic). Will be created if does not exist.\n"
         + "If not provided, default to 'conrad/labolaliberte_upload/metashape/<yyyy>/<missionid>/'.",
     )
     parser.add_argument(
         "-id",
         "--mission-id",
-        help="The identifier for the run. Will be used in naming output files."
-        + "It should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'."
+        help="The identifier for the run. Will be used in naming output files.\n"
+        + "It should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'.\n"
         + "If not provided, it will be extracted from the images path.",
     )
     parser.add_argument(
         "-crs",
         "--project-crs",
-        help="CRS EPSG code that project outputs should be in "
-        + "(projection should be in meter units and intended for the project area). "
-        + "It should be in the format: 'EPSG::<EPSG code>'."
-        + "If not provided, it will be calculated from the median coordinates of the images.",
+        help="CRS EPSG code that project outputs should be in.\n"
+        + "It should be in the format: 'EPSG::<EPSG code>'.\n"
+        + "If not provided, it will be calculated from the median coordinates of the images. (using UTM).",
     )
     parser.add_argument(
         "-cam",
@@ -68,7 +68,7 @@ def parse_args():
         "-quick",
         "--quick-process",
         action="store_true",
-        help="Enable faster processing by disabling High quality and Disable filtering options (HighDis). "
+        help="Faster processing by disabling High quality and Disable filtering options (HighDis).\n"
         + "By default, High quality and Disable filtering options are enabled.",
     )
     parser.add_argument(
