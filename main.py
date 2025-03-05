@@ -79,33 +79,34 @@ def parse_args():
 
     args = parser.parse_args()
 
-    # Extract the last part of the images path to use as mission_id if not provided
-    if args.mission_id is None and args.images_path:
-        images_path = args.images_path
-        mission_id = os.path.basename(os.path.normpath(images_path))
-        # Validate mission_id format
-        mission_id_pattern = r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$"
-        if not re.match(mission_id_pattern, mission_id):
-            raise ValueError(
-                f"Invalid mission_id format from images path: {mission_id}. "
-                "The mission_id should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'. "
-                "Please specify a valid --mission-id."
-            )
-        args.mission_id = mission_id
+    if args.config_file == default_config_file:
+        # Extract the last part of the images path to use as mission_id if not provided
+        if args.mission_id is None and args.images_path:
+            images_path = args.images_path
+            mission_id = os.path.basename(os.path.normpath(images_path))
+            # Validate mission_id format
+            mission_id_pattern = r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$"
+            if not re.match(mission_id_pattern, mission_id):
+                raise ValueError(
+                    f"Invalid mission_id format from images path: {mission_id}. "
+                    "The mission_id should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'. "
+                    "Please specify a valid --mission-id."
+                )
+            args.mission_id = mission_id
 
-    # Extract year from the mission_id (first 4 characters)
-    mission_year = args.mission_id[:4]
-    # Assign default paths if not provided
-    if args.project_path is None:
-        args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
-    if args.output_path is None:
-        args.output_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/"
+        # Extract year from the mission_id (first 4 characters)
+        mission_year = args.mission_id[:4]
+        # Assign default paths if not provided
+        if args.project_path is None:
+            args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
+        if args.output_path is None:
+            args.output_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/"
 
-    # Determine project CRS if not provided
-    if args.project_crs is None and args.images_path:
-        # Calculate median coordinates from all images
-        median_latitude, median_longitude = calculate_median_coordinates(args.images_path)
-        args.project_crs = calculate_utm_epsg(median_latitude, median_longitude)
+        # Determine project CRS if not provided
+        if args.project_crs is None and args.images_path:
+            # Calculate median coordinates from all images
+            median_latitude, median_longitude = calculate_median_coordinates(args.images_path)
+            args.project_crs = calculate_utm_epsg(median_latitude, median_longitude)
 
     return args, mission_year
 
