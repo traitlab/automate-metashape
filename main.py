@@ -108,7 +108,10 @@ def parse_args():
             median_latitude, median_longitude = calculate_median_coordinates(args.images_path)
             args.project_crs = calculate_utm_epsg(median_latitude, median_longitude)
 
-    return args, mission_year
+        return args, mission_year
+    
+    else:
+        return args, None
 
 args, mission_year = parse_args()
 
