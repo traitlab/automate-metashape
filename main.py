@@ -115,8 +115,6 @@ args, mission_year = parse_args()
 # Check if required parameters are provided or appropriate config file is used
 required_params = {
     "images_path": "Error: No images path provided. Please specify --images-path or use an appropriate config file.",
-    "mission_id": "Error: No run name provided. Please specify --mission-id or use an appropriate config file.",
-    "project_crs": "Error: No project CRS provided. Please specify --project-crs or use an appropriate config file."
 }
 
 if args.config_file == default_config_file:
