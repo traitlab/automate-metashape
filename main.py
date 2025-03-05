@@ -79,9 +79,9 @@ def parse_args():
 
     args = parser.parse_args()
 
-    if args.config_file == default_config_file:
+    if args.config_file == default_config_file and args.images_path:
         # Extract the last part of the images path to use as mission_id if not provided
-        if args.mission_id is None and args.images_path:
+        if args.mission_id is None:
             images_path = args.images_path
             mission_id = os.path.basename(os.path.normpath(images_path))
             # Validate mission_id format
@@ -103,7 +103,7 @@ def parse_args():
             args.output_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/"
 
         # Determine project CRS if not provided
-        if args.project_crs is None and args.images_path:
+        if args.project_crs is None:
             # Calculate median coordinates from all images
             median_latitude, median_longitude = calculate_median_coordinates(args.images_path)
             args.project_crs = calculate_utm_epsg(median_latitude, median_longitude)
