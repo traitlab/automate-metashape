@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 # File for running a metashape workflow
 
-# Derek Young and Alex Mandel
-# University of California, Davis
-# 2021
-
 import argparse
+import contextlib
 import sys
+from pathlib import Path
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
 
 ## Define where to get the config file (only used if running interactively)
-manual_config_file = "config/example_dev.yml"
+# manual_config_file = "config/config-base.yml"
+manual_config_file = Path(
+    Path(__file__).parent, "..", "config", "config-base.yml"
+).resolve()
 # ---- If not running interactively, the config file should be supplied as the command-line argument after the python script, e.g.: python metashape_workflow.py config.yml
 
 
@@ -28,7 +29,9 @@ def parse_args():
         + "All other arguments are optional overrides to the corresponding entry in that config"
     )
     parser.add_argument(
-        "config_file", default=manual_config_file, help="A path to a yaml config file."
+        "--config_file",
+        default=manual_config_file,
+        help="A path to a yaml config file.",
     )
     parser.add_argument(
         "--photo-path",
@@ -64,11 +67,30 @@ def parse_args():
     return args
 
 
-args = parse_args()
+if __name__ == "__main__":
+    args = parse_args()
 
-# Initialize the workflow instance with the configuration file and the dictionary representation of
-# CLI overrides
-meta = MetashapeWorkflow(config_file=args.config_file, override_dict=args.__dict__)
+    # Get the non-None overrides provided on the command line
+    override_dict = {k: v for k, v in args.__dict__.items() if v is not None}
 
-### Run the Metashape workflow
-meta.run()
+    # Initialize the workflow instance with the configuration file and the dictionary representation of
+    # CLI overrides
+    meta = MetashapeWorkflow(config_file=args.config_file, override_dict=override_dict)
+
+    ### Run the Metashape workflow
+    # The argo workflow requires that all stdout is json formatted. Since this isn't the case for the
+    # metashape logs, we redirect to standard error.
+    with contextlib.redirect_stdout(sys.stderr):
+        # Actually run the processing step
+        try:
+            meta.run()
+        except Exception as e:
+            # TODO make this error message more descriptive
+            print(
+                "Metashape errored while processing, the completed paths will still be reported. "
+                + "The error was: \n"
+                + e.__str__()
+            )
+
+    # Log where the data files were written as json dict
+    print(meta.get_written_paths(as_json=True))

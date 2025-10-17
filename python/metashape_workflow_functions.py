@@ -1,12 +1,15 @@
 #### Import libraries
+import collections
 import datetime
 import glob
+import json
 import os
 import platform
 import re
 
 # Import the fuctionality we need to make time stamps to measure performance
 import time
+from pathlib import Path
 
 ### Import the Metashape functionality
 import Metashape
@@ -14,6 +17,48 @@ import yaml
 
 
 #### Helper functions
+def recursive_update(d, u):
+    """ "
+    Recursively update dictionary `d` with any keys from `u`. New keys contained in `u` but not in `d`
+    will be created.
+
+    Taken from: https://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth
+    """
+    for k, v in u.items():
+        if isinstance(v, collections.abc.Mapping):
+            d[k] = recursive_update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
+
+
+def make_derived_yaml(input_path: str, output_path: str, override_options: dict):
+    """Create a new config file by reading one file and updating specific values
+
+    Args:
+        input_path (str):
+            The path to the yaml config file to load from
+        output_path (str):
+            The path to the yaml config file to write out. Containing folder will be created if needed.
+        override_options (dict):
+            A potentially-nested dictionary
+    """
+    # Read the input config
+    with open(input_path, "r") as ymlfile:
+        base_cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
+
+    # Update the values in the base config
+    updated_config = recursive_update(base_cfg, override_options)
+
+    # Create the output folder if needed
+    Path(output_path).parent.mkdir(exist_ok=True, parents=True)
+
+    # Write out the updated config
+    with open(output_path, "w") as ymlfile:
+        # Preserve the initial order of keys for readability
+        yaml.dump(updated_config, ymlfile, sort_keys=False)
+
+
 def convert_objects(a_dict):
     """
     Convert strings that refer to metashape objects (e.g. "Metashape.MoasicBlending") into metashape objects
@@ -73,8 +118,6 @@ def get_camera(chunk, label):
     return None
 
 
-# Set the log file name-value separator
-# Chose ; as : is in timestamps
 # TODO: Consider moving log to json/yaml formatting using a dict
 
 
@@ -95,6 +138,8 @@ class MetashapeWorkflow:
         self.log_file = None
         self.run_id = None
         self.cfg = None
+        # track the written paths
+        self.written_paths = {}
         # Parse the yaml confif
         self.read_yaml()
         # Apply any manual overrides
@@ -107,17 +152,12 @@ class MetashapeWorkflow:
             self.cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
 
     def override_config(self, override_dict):
-        # Remove any override options that are None
-        override_dict = {k: v for k, v in override_dict.items() if v is not None}
-
-        # Since the CLI parser has nargs="+" for the photo_path, it will always be a list of values
-        # even if only one is provided. To match the format of the yaml parser, if only one value
-        # is provided, transform from a list of length one to just the value in that list
-        if "photo_path" in override_dict and len(override_dict["photo_path"]) == 1:
-            override_dict["photo_path"] = override_dict["photo_path"][0]
-
+        """
+        Update self.cfg using a potentially-nested dictionary of override values, in the same
+        stucture as the yaml config file.
+        """
         # Update any of the fields in the override dict to that value
-        self.cfg.update(override_dict)
+        self.cfg = recursive_update(self.cfg, override_dict)
 
     #### Functions for each major step in Metashape
 
@@ -166,8 +206,8 @@ class MetashapeWorkflow:
         if self.cfg["buildPointCloud"]["enabled"]:
             self.build_point_cloud()
 
-        if self.cfg["buildModel"]["enabled"]:
-            self.build_model()
+        if self.cfg["buildMesh"]["enabled"]:
+            self.build_mesh()
 
         # For this step, the check for whether it is enabled in the config happens inside the function, because there are two steps (DEM and ortho), each of which can be enabled independently
         self.build_dem_orthomosaic()
@@ -208,10 +248,7 @@ class MetashapeWorkflow:
             )  # extracts file base name from path
             run_name, _ = os.path.splitext(file_basename)  # removes extension
 
-        ## Project file example to make: "projectID_YYYYMMDDtHHMM-jobID.psx"
-        timestamp = stamp_time()
-        self.run_id = "_".join([run_name, timestamp])
-        # TODO: If there is a slurm JobID, append to time (separated with "-", not "_"). This will keep jobs initiated in the same minute distinct
+        self.run_id = run_name
 
         project_file = os.path.join(
             self.cfg["project_path"], ".".join([self.run_id, "psx"])
@@ -426,8 +463,21 @@ class MetashapeWorkflow:
                         ]
                     )
 
+        # Set the sensor type (e.g. Frame camera, Spherical camera)
+        self.set_sensor_type(self.cfg["addPhotos"]["sensor_type"])
+
         self.doc.save()
 
+        return True
+
+    def set_sensor_type(self, sensor_type):
+        """
+        Sets the type of sensor used for data collection. Tested choices so far:
+        Metashape.Sensor.Type.Frame, Metashape.Sensor.Type.Spherical.
+        """
+        for sensor in self.doc.chunk.sensors:
+            sensor.type = sensor_type
+        self.doc.save()
         return True
 
     def calibrate_reflectance(self):
@@ -559,6 +609,7 @@ class MetashapeWorkflow:
         )
         # Defaults to xml format, which is the only one we've used so far
         self.doc.chunk.exportCameras(path=output_file)
+        self.written_paths["camera_export"] = output_file  # export
 
     def align_photos(self):
         """
@@ -846,19 +897,28 @@ class MetashapeWorkflow:
 
         if self.cfg["buildPointCloud"]["export"]:
 
-            output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_points.laz"
-            )
+            if (
+                self.cfg["buildPointCloud"]["export_format"]
+                == Metashape.PointCloudFormatCOPC
+            ):
+                export_file_ending = "_points-copc.laz"
+            else:
+                export_file_ending = "_points.laz"
 
+            # Export the point cloud
+            output_file = os.path.join(
+                self.cfg["output_path"], self.run_id + export_file_ending
+            )
             if self.cfg["buildPointCloud"]["classes"] == "ALL":
                 # call without classes argument (Metashape then defaults to all classes)
                 self.doc.chunk.exportPointCloud(
                     path=output_file,
                     source_data=Metashape.PointCloudData,
-                    format=Metashape.PointCloudFormatLAS,
+                    format=self.cfg["buildPointCloud"]["export_format"],
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
                     subdivide_task=self.cfg["subdivide_task"],
                 )
+                self.written_paths["point_cloud_all_classes"] = output_file  # export
             else:
                 # call with classes argument
                 self.doc.chunk.exportPointCloud(
@@ -866,15 +926,16 @@ class MetashapeWorkflow:
                     source_data=Metashape.PointCloudData,
                     format=Metashape.PointCloudFormatLAZ,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
-                    clases=self.cfg["buildPointCloud"]["classes"],
+                    classes=self.cfg["buildPointCloud"]["classes"],
                     subdivide_task=self.cfg["subdivide_task"],
                 )
+                self.written_paths["point_cloud_subset_classes"] = output_file  # export
 
         return True
 
-    def build_model(self):
+    def build_mesh(self):
         """
-        Build and export the model
+        Build and export the mesh
         """
 
         start_time = time.time()
@@ -882,8 +943,8 @@ class MetashapeWorkflow:
         self.doc.chunk.buildModel(
             surface_type=Metashape.Arbitrary,
             interpolation=Metashape.EnabledInterpolation,
-            face_count=self.cfg["buildModel"]["face_count"],
-            face_count_custom=self.cfg["buildModel"][
+            face_count=self.cfg["buildMesh"]["face_count"],
+            face_count_custom=self.cfg["buildMesh"][
                 "face_count_custom"
             ],  # Only used if face_count is custom
             source_data=Metashape.DepthMapsData,
@@ -893,65 +954,37 @@ class MetashapeWorkflow:
 
         # record results to file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflow.sep.join(["Build Model", time_taken]) + "\n")
+            file.write(MetashapeWorkflow.sep.join(["Build Mesh", time_taken]) + "\n")
 
-        # Save the model
+        # Save the mesh
         self.doc.save()
 
-        if self.cfg["buildModel"]["export_georeferenced"]:
+        if self.cfg["buildMesh"]["export"]:
+
+            # Check for whether shifting the coordinate frame is desired
+            if self.cfg["buildMesh"]["shift_crs_to_cameras"] is True:
+                shift = self.get_cameraset_origin()
+            else:
+                shift = Metashape.Vector([0, 0, 0])
+
             output_file = os.path.join(
                 self.cfg["output_path"],
-                self.run_id
-                + "_model_georeferenced."
-                + self.cfg["buildModel"]["export_extension"],
+                self.run_id + "_mesh." + self.cfg["buildMesh"]["export_extension"],
             )
-            self.doc.chunk.exportModel(path=output_file)
-
-        if self.cfg["buildModel"]["export_local"]:
-            # Wipe the CRS and transform so it aligns with the cameras
-            # The approach was recommended here: https://www.agisoft.com/forum/index.php?topic=8210.0
-            old_crs = self.doc.chunk.crs
-            old_transform_matrix = self.doc.chunk.transform.matrix
-            # Wipe the transform
-            self.doc.chunk.crs = None
-            self.doc.chunk.transform.matrix = None
-
-            # Export the transform
-            if self.cfg["buildModel"]["export_transform"]:
-                output_file = os.path.join(
-                    self.cfg["output_path"],
-                    self.run_id + "_local_model_transform.csv",
-                )
-
-                with open(output_file, "w") as fileh:
-                    # This is a row-major representation
-                    transform_tuple = tuple(old_transform_matrix)
-                    # Write each row in the the transform
-                    for i in range(4):
-                        fileh.write(
-                            ", ".join(str(transform_tuple[i * 4 : (i + 1) * 4]))
-                        )
-
-            # Export the model
-            output_file = os.path.join(
-                self.cfg["output_path"],
-                self.run_id
-                + "_model_local."
-                + self.cfg["buildModel"]["export_extension"],
+            # Export the georeferenced mesh in the project CRS. The metadata file is the only thing
+            # that encodes the CRS.
+            self.doc.chunk.exportModel(
+                path=output_file,
+                crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
+                save_metadata_xml=True,
+                shift=shift,
             )
-            self.doc.chunk.exportModel(path=output_file)
-
-            # Reset CRS and transform
-            self.doc.chunk.crs = old_crs
-            self.doc.chunk.transform.matrix = old_transform_matrix
-
-            self.doc.open(self.doc.path)
 
         return True
 
     def build_dem_orthomosaic(self):
         """
-        Build end export DEM
+        Build and export DEM
         """
 
         # classify ground points if specified
@@ -1002,7 +1035,10 @@ class MetashapeWorkflow:
                         source_data=Metashape.ElevationData,
                         image_compression=compression,
                     )
-
+                    self.written_paths[f"DEM_{self.cfg['buildDem']['surface'][0]}"] = (
+                        output_file  # export
+                    )
+                # log to output file to variable
             if "DTM-ptcloud" in self.cfg["buildDem"]["surface"]:
 
                 start_time = time.time()
@@ -1150,7 +1186,7 @@ class MetashapeWorkflow:
         ## Export orthomosaic
         if self.cfg["buildOrthomosaic"]["export"]:
             output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_ortho_" + file_ending + ".tif"
+                self.cfg["output_path"], self.run_id + "_ortho-" + file_ending + ".tif"
             )
 
             compression = Metashape.ImageCompression()
@@ -1168,6 +1204,7 @@ class MetashapeWorkflow:
                 source_data=Metashape.OrthomosaicData,
                 image_compression=compression,
             )
+            self.written_paths["ortho_" + file_ending] = output_file  # export
 
         if self.cfg["buildOrthomosaic"]["remove_after_export"]:
             self.doc.chunk.remove(self.doc.chunk.orthomosaics)
@@ -1209,16 +1246,10 @@ class MetashapeWorkflow:
                 MetashapeWorkflow.sep.join(["Add secondary photos", time2]) + "\n"
             )
 
-        # Save the transform matrix
-        matrix_saved = self.doc.chunk.transform.matrix
-
         # Align the secondary photos (really, align all photos, but only the secondary photos will be
         # affected because Metashape only matches and aligns photos that were not already
         # matched/aligned, assuming keep_keypoints and reset_alignment were set as required).
         self.align_photos()
-
-        # Restore the saved transform matrix
-        self.doc.chunk.transform.matrix = matrix_saved
 
         self.doc.save()
 
@@ -1230,6 +1261,7 @@ class MetashapeWorkflow:
         output_file = os.path.join(self.cfg["output_path"], self.run_id + "_report.pdf")
 
         self.doc.chunk.exportReport(path=output_file)
+        self.written_paths["report"] = output_file  # export
 
         return True
 
@@ -1255,3 +1287,67 @@ class MetashapeWorkflow:
             file.write("### END CONFIGURATION ###\n")
 
         return True
+
+    def get_written_paths(self, as_json: bool = False):
+        # Convert to a json string representation if requested
+        if as_json:
+            json_str = json.dumps(self.written_paths)
+            return json_str
+        # Otherwise just return the dictionary representation
+        return self.written_paths
+
+    def get_cameraset_origin(self, round: int = 100) -> Metashape.Vector:
+        """
+        Goes through the EXIF lat/lon data from the cameras, converts it into
+        the project CRS, and then reports the (rounded) camera mean as the
+        project origin. The purpose is to get around the accuracy limitations
+        of float32 values (the default for point clouds and meshes) by having
+        a fixed origin offset per project.
+
+        NOTE: The shifted origin is reported by exportModel via the
+        save_metadata_xml mechanism.
+
+        Arguments:
+            round (int): The value to round (really floor) the origin to. The
+                purpose of this is to make the origin more human readable,
+                while still getting the accuracy benefits that come when your
+                float32 data points are values in the 100s-1000s instead of in
+                the millions
+
+        Returns: Metashape.Vector of the camera origin. For now Z is kept at 0
+            and only (X, Y) are calculated from the cameras.
+        """
+
+        # The camera reference location is known to be in lat/lon
+        camera_crs = Metashape.CoordinateSystem("EPSG::4326")
+
+        # Average the camera locations without using libraries like numpy
+        x = 0.0
+        y = 0.0
+        n_valid = 0
+        for camera in self.doc.chunk.cameras:
+
+            # Check for missing GPS EXIF data
+            if camera.reference.location is None:
+                continue
+
+            # Get the camera location in the project CRS
+            location = Metashape.CoordinateSystem.transform(
+                camera.reference.location,
+                source=camera_crs,
+                target=Metashape.CoordinateSystem(self.cfg["project_crs"]),
+            )
+            x += location[0]
+            y += location[1]
+            n_valid += 1
+
+        # Average over the number of valid images
+        if n_valid > 0:
+            x /= n_valid
+            y /= n_valid
+
+        # Round the values for easier readability
+        x = int(x / round) * round
+        y = int(y / round) * round
+
+        return Metashape.Vector([x, y, 0])
