@@ -125,3 +125,7 @@ dev/
 ## Mac system file
 .DS_Store
 /.venv
+
+# Workspace files
+*.code-workspace
+**/.vscode/

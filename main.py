@@ -31,19 +31,19 @@ def parse_args():
         "--config_file",
         default=default_config_file,
         help="Path to a yaml config file.\n"
-        + "If not provided, default to 'config/config_lefolab_default.yml'.",
+        + "If not provided, default is 'config/config_lefolab_default.yml'.",
     )
     parser.add_argument(
         "-p",
         "--project-path",
         help="Path to save Metashape project file (.psx). Will be created if does not exist.\n"
-        + "If not provided, default to 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>/'.",
+        + "If not provided, default is 'conrad/labolaliberte_metashape_projects/<yyyy>/<missionid>/'.",
     )
     parser.add_argument(
         "-o",
         "--output-path",
         help="Path for exports (e.g., cloudpoint, DSM, orthomosaic). Will be created if does not exist.\n"
-        + "If not provided, default to 'conrad/labolaliberte_upload/metashape/<yyyy>/<missionid>/'.",
+        + "If not provided, default is '<project_path>/metashape/'.",
     )
     parser.add_argument(
         "-id",
@@ -100,7 +100,7 @@ def parse_args():
         if args.project_path is None:
             args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
         if args.output_path is None:
-            args.output_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/"
+            args.output_path = f"{args.project_path}/metashape/"
 
         # Determine project CRS if not provided
         if args.project_crs is None:
