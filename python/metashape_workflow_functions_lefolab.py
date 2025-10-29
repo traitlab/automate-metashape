@@ -88,7 +88,7 @@ def diff_time(t2, t1):
 
 class MetashapeWorkflowLefolab:
 
-    sep = "; "
+    sep = ": "
 
     def __init__(
         self,
@@ -136,29 +136,39 @@ class MetashapeWorkflowLefolab:
 
         self.enable_and_log_gpu()
 
-        if (self.cfg["images_path"] != "") and (
-            self.cfg["addPhotos"]["enabled"]
-        ):  # only add photos if there is a photo directory listed
-            self.add_photos()
+        # Skip add_photos and align_photos if resuming after GCPs
+        if not self.cfg.get("after_gcps"):
+            # Add photos
+            if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
+                self.add_photos()
 
-        # if self.cfg["calibrateReflectance"]["enabled"]:
-        #     self.calibrate_reflectance()
+            # if self.cfg["calibrateReflectance"]["enabled"]:
+            #     self.calibrate_reflectance()
 
-        if self.cfg["alignPhotos"]["enabled"]:
-            self.align_photos()
-            self.reset_region()
+            # Align photos
+            if self.cfg["alignPhotos"]["enabled"]:
+                self.align_photos()
+                self.reset_region()
 
         # if self.cfg["filterPointsUSGS"]["enabled"]:
         #     self.filter_points_usgs_part1()
         #     self.reset_region()
 
-        if self.cfg["addGCPs"]["enabled"]:
+        # Add GCPs manually via GUI if specified
+        if self.cfg.get("add_gcps"):
             self.add_gcps()
-            self.reset_region()
+            return
 
-        if self.cfg["optimizeCameras"]["enabled"]:
-            self.optimize_cameras()
-            self.reset_region()
+        if self.cfg.get("after_gcps"):
+            self.after_gcps()
+
+        # if self.cfg["addGCPs"]["enabled"]:
+        #     self.add_gcps()
+        #     self.reset_region()
+
+        # if self.cfg["optimizeCameras"]["enabled"]:
+        #     self.optimize_cameras()
+        #     self.reset_region()
 
         # if self.cfg["filterPointsUSGS"]["enabled"]:
         #     self.filter_points_usgs_part2()
@@ -237,9 +247,7 @@ class MetashapeWorkflowLefolab:
         """
 
         # create a handle to the Metashape object
-        self.doc = (
-            Metashape.Document()
-        )  # When running via Metashape, can use: doc = Metashape.app.document
+        self.doc = (Metashape.Document())  # When running via Metashape, can use: doc = Metashape.app.document
 
         # If specified, open existing project
         if self.cfg["load_project"] != "":
@@ -677,6 +685,45 @@ class MetashapeWorkflowLefolab:
     #     self.doc.save()
 
     #     return True
+
+    def add_gcps(self):
+        """
+        Pause processing and continue with GUI to add GCPs manually
+        """
+        chunk = self.doc.chunk
+        
+        for camera in chunk.cameras:
+            if not camera.photo:
+                continue
+            old_path = camera.photo.path
+            
+            if old_path.startswith("/mnt/nfs/lefodata/"):
+                new_path = old_path.replace("/mnt/nfs/lefodata/", "//lefodata/")
+                camera.photo.path = new_path
+            elif old_path.startswith("/mnt/nfs/conrad/"):
+                new_path = old_path.replace("/mnt/nfs/conrad/", "//conrad-irbv.irbv.umontreal.ca/")
+                camera.photo.path = new_path
+            # Not working on Windows paths currently
+
+        self.doc.save()
+        print("\n[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, then rerun with --after-gcps to resume processing.")
+        gui_path = self.doc.path.replace('/mnt/nfs/conrad/', '//conrad-irbv.irbv.umontreal.ca/').replace('/', '\\')
+        print(f"[INFO] Command to rerun: {' '.join(sys.argv).replace(' -gcps', '').replace(' -add-gcps', '')} -load {self.doc.path} --after-gcps")
+        print(f"[INFO] Open project on GUI server at: {gui_path}")
+        return
+
+    def after_gcps(self):
+        """
+        Resume processing after GCPs have been added manually via GUI
+        """
+        chunk = self.doc.chunk
+
+        for camera in chunk.cameras:
+            if not camera.photo:
+                continue
+            camera.photo.path = camera.label
+
+        self.doc.save()
 
     # def filter_points_usgs_part1(self):
 

@@ -65,6 +65,22 @@ def parse_args():
         help="Path to a camera calibration file (.xml).",
     )
     parser.add_argument(
+        "-gcps",
+        "--add-gcps",
+        action="store_true",
+        help="Pause processeing after photos alignment to allow GCPs to be added using the GUI, then rerun with --after-gcps to continue.",
+    )
+    parser.add_argument(
+        "--after-gcps",
+        action="store_true",
+        help="Continue processing after GCPs have been added with GUI.",
+    )
+    parser.add_argument(
+        "-load",
+        "--load-project",
+        help="Path to a Metashape project file (.psx) to load.",
+    )
+    parser.add_argument(
         "-quick",
         "--quick-process",
         action="store_true",
@@ -98,7 +114,7 @@ def parse_args():
         mission_year = args.mission_id[:4]
         # Assign default paths if not provided
         if args.project_path is None:
-            args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/"
+            args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}"
         if args.output_path is None:
             args.output_path = f"{args.project_path}/metashape/"
 
