@@ -68,20 +68,20 @@ def diff_time(t2, t1):
         return f"{seconds}s"
 
 
-# Used by add_gcps function
-def get_marker(chunk, label):
-    for marker in chunk.markers:
-        if marker.label == label:
-            return marker
-    return None
+# # Used by add_gcps function
+# def get_marker(chunk, label):
+#     for marker in chunk.markers:
+#         if marker.label == label:
+#             return marker
+#     return None
 
 
-# Used by add_gcps function
-def get_camera(chunk, label):
-    for camera in chunk.cameras:
-        if camera.label.lower() == label.lower():
-            return camera
-    return None
+# # Used by add_gcps function
+# def get_camera(chunk, label):
+#     for camera in chunk.cameras:
+#         if camera.label.lower() == label.lower():
+#             return camera
+#     return None
 
 
 # Set the log file name-value separator
@@ -252,9 +252,9 @@ class MetashapeWorkflowLefolab:
             # Initialize a chunk, set its CRS as specified
             chunk = self.doc.addChunk()
             chunk.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
-            chunk.marker_crs = Metashape.CoordinateSystem(
-                self.cfg["addGCPs"]["gcp_crs"]
-            )
+            # chunk.marker_crs = Metashape.CoordinateSystem(
+            #     self.cfg["addGCPs"]["gcp_crs"]
+            # )
 
         # Save doc doc as new project (even if we opened an existing project, save as a separate one so the existing project remains accessible in its original state)
         self.doc.save(project_file)
@@ -466,107 +466,107 @@ class MetashapeWorkflowLefolab:
 
     #     return True
 
-    def add_gcps(self):
-        """
-        Add GCPs (GCP coordinates and the locations of GCPs in individual photos.
-        See the helper script (and the comments therein) for details on how to prepare the data needed by this function: R/prep_gcps.R
-        """
+    # def add_gcps(self):
+    #     """
+    #     Add GCPs (GCP coordinates and the locations of GCPs in individual photos.
+    #     See the helper script (and the comments therein) for details on how to prepare the data needed by this function: R/prep_gcps.R
+    #     """
 
-        # Determine the location of the GCPs file, which is also the base path to prepend to the GCP
-        # camera label (relative to what's specified in the GCPs file, which is a relative path), to
-        # make it into an absolute path to match the label of the camera in the Metashape. Note the
-        # difference between the two camera labels: one is the camera label specified in the GCPs file
-        # (relative path), and one is the camera label in the Metashape (absolute). Currently, this
-        # assumes that all of the GCPs apply to the first provided folder of cameras (i.e., the only
-        # folder provided, or the first folder provided if multiple are provided) -- and that this is
-        # the folder containing the GCP definition file. TODO: Tolerate GCPs split across multiple
-        # folders of input images:
-        # https://github.com/open-forest-observatory/automate-metashape-2/issues/49.
+    #     # Determine the location of the GCPs file, which is also the base path to prepend to the GCP
+    #     # camera label (relative to what's specified in the GCPs file, which is a relative path), to
+    #     # make it into an absolute path to match the label of the camera in the Metashape. Note the
+    #     # difference between the two camera labels: one is the camera label specified in the GCPs file
+    #     # (relative path), and one is the camera label in the Metashape (absolute). Currently, this
+    #     # assumes that all of the GCPs apply to the first provided folder of cameras (i.e., the only
+    #     # folder provided, or the first folder provided if multiple are provided) -- and that this is
+    #     # the folder containing the GCP definition file. TODO: Tolerate GCPs split across multiple
+    #     # folders of input images:
+    #     # https://github.com/open-forest-observatory/automate-metashape-2/issues/49.
 
-        images_paths = self.cfg["images_path"]
+    #     images_paths = self.cfg["images_path"]
 
-        # If it's a single string (i.e. one directory), make it a list of one string so we can take the
-        # first element using the same operation we would use on a list of strings
-        if isinstance(images_paths, str):
-            images_paths = [images_paths]
+    #     # If it's a single string (i.e. one directory), make it a list of one string so we can take the
+    #     # first element using the same operation we would use on a list of strings
+    #     if isinstance(images_paths, str):
+    #         images_paths = [images_paths]
 
-        # Take the first folder and assume it's the one with the GCPs file
-        images_path = images_paths[0]
+    #     # Take the first folder and assume it's the one with the GCPs file
+    #     images_path = images_paths[0]
 
-        ## Tag specific pixels in specific images where GCPs are located
-        path = os.path.join(images_path, "gcps", "prepared", "gcp_imagecoords_table.csv")
-        file = open(path)
-        content = file.read().splitlines()
+    #     ## Tag specific pixels in specific images where GCPs are located
+    #     path = os.path.join(images_path, "gcps", "prepared", "gcp_imagecoords_table.csv")
+    #     file = open(path)
+    #     content = file.read().splitlines()
 
-        for line in content:
-            marker_label, camera_label, x_proj, y_proj = line.split(",")
-            if (
-                marker_label[0] == '"'
-            ):  # if it's in quotes (from saving CSV in Excel), remove quotes
-                marker_label = marker_label[
-                    1:-1
-                ]  # need to get it out of the two pairs of quotes
-            if (
-                camera_label[0] == '"'
-            ):  # if it's in quotes (from saving CSV in Excel), remove quotes
-                camera_label = camera_label[1:-1]
+    #     for line in content:
+    #         marker_label, camera_label, x_proj, y_proj = line.split(",")
+    #         if (
+    #             marker_label[0] == '"'
+    #         ):  # if it's in quotes (from saving CSV in Excel), remove quotes
+    #             marker_label = marker_label[
+    #                 1:-1
+    #             ]  # need to get it out of the two pairs of quotes
+    #         if (
+    #             camera_label[0] == '"'
+    #         ):  # if it's in quotes (from saving CSV in Excel), remove quotes
+    #             camera_label = camera_label[1:-1]
 
-            marker = get_marker(self.doc.chunk, marker_label)
-            if not marker:
-                marker = self.doc.chunk.addMarker()
-                marker.label = marker_label
+    #         marker = get_marker(self.doc.chunk, marker_label)
+    #         if not marker:
+    #             marker = self.doc.chunk.addMarker()
+    #             marker.label = marker_label
 
-            # Prepend the image path to the GCP's camera label to make it an absolute path
-            camera_label = os.path.join(images_path, camera_label)
+    #         # Prepend the image path to the GCP's camera label to make it an absolute path
+    #         camera_label = os.path.join(images_path, camera_label)
 
-            camera = get_camera(self.doc.chunk, camera_label)
-            if not camera:
-                print(camera_label + " camera not found in project")
-                continue
+    #         camera = get_camera(self.doc.chunk, camera_label)
+    #         if not camera:
+    #             print(camera_label + " camera not found in project")
+    #             continue
 
-            marker.projections[camera] = Metashape.Marker.Projection(
-                (float(x_proj), float(y_proj)), True
-            )
+    #         marker.projections[camera] = Metashape.Marker.Projection(
+    #             (float(x_proj), float(y_proj)), True
+    #         )
 
-        ## Assign real-world coordinates to each GCP
-        path = os.path.join(images_path, "gcps", "prepared", "gcp_table.csv")
+    #     ## Assign real-world coordinates to each GCP
+    #     path = os.path.join(images_path, "gcps", "prepared", "gcp_table.csv")
 
-        file = open(path)
-        content = file.read().splitlines()
+    #     file = open(path)
+    #     content = file.read().splitlines()
 
-        for line in content:
-            marker_label, world_x, world_y, world_z = line.split(",")
-            if (
-                marker_label[0] == '"'
-            ):  # if it's in quotes (from saving CSV in Excel), remove quotes
-                marker_label = marker_label[
-                    1:-1
-                ]  # need to get it out of the two pairs of quotes
+    #     for line in content:
+    #         marker_label, world_x, world_y, world_z = line.split(",")
+    #         if (
+    #             marker_label[0] == '"'
+    #         ):  # if it's in quotes (from saving CSV in Excel), remove quotes
+    #             marker_label = marker_label[
+    #                 1:-1
+    #             ]  # need to get it out of the two pairs of quotes
 
-            marker = get_marker(self.doc.chunk, marker_label)
-            if not marker:
-                marker = self.doc.chunk.addMarker()
-                marker.label = marker_label
+    #         marker = get_marker(self.doc.chunk, marker_label)
+    #         if not marker:
+    #             marker = self.doc.chunk.addMarker()
+    #             marker.label = marker_label
 
-            marker.reference.location = (float(world_x), float(world_y), float(world_z))
-            marker.reference.accuracy = (
-                self.cfg["addGCPs"]["marker_location_accuracy"],
-                self.cfg["addGCPs"]["marker_location_accuracy"],
-                self.cfg["addGCPs"]["marker_location_accuracy"],
-            )
+    #         marker.reference.location = (float(world_x), float(world_y), float(world_z))
+    #         marker.reference.accuracy = (
+    #             self.cfg["addGCPs"]["marker_location_accuracy"],
+    #             self.cfg["addGCPs"]["marker_location_accuracy"],
+    #             self.cfg["addGCPs"]["marker_location_accuracy"],
+    #         )
 
-        self.doc.chunk.marker_location_accuracy = (
-            self.cfg["addGCPs"]["marker_location_accuracy"],
-            self.cfg["addGCPs"]["marker_location_accuracy"],
-            self.cfg["addGCPs"]["marker_location_accuracy"],
-        )
-        self.doc.chunk.marker_projection_accuracy = self.cfg["addGCPs"][
-            "marker_projection_accuracy"
-        ]
+    #     self.doc.chunk.marker_location_accuracy = (
+    #         self.cfg["addGCPs"]["marker_location_accuracy"],
+    #         self.cfg["addGCPs"]["marker_location_accuracy"],
+    #         self.cfg["addGCPs"]["marker_location_accuracy"],
+    #     )
+    #     self.doc.chunk.marker_projection_accuracy = self.cfg["addGCPs"][
+    #         "marker_projection_accuracy"
+    #     ]
 
-        self.doc.save()
+    #     self.doc.save()
 
-        return True
+    #     return True
 
     # def export_cameras(self):
     #     output_file = os.path.join(
@@ -629,41 +629,41 @@ class MetashapeWorkflowLefolab:
 
         return True
 
-    def optimize_cameras(self):
-        """
-        Optimize cameras
-        """
+    # def optimize_cameras(self):
+    #     """
+    #     Optimize cameras
+    #     """
 
-        # get a beginning time stamp
-        timer1a = time.time()
+    #     # get a beginning time stamp
+    #     timer1a = time.time()
 
-        # Disable camera locations as reference if specified in YML
-        if (
-            self.cfg["addGCPs"]["enabled"]
-            and self.cfg["addGCPs"]["optimize_w_gcps_only"]
-        ):
-            n_cameras = len(self.doc.chunk.cameras)
-            for i in range(0, n_cameras):
-                self.doc.chunk.cameras[i].reference.enabled = False
+    #     # Disable camera locations as reference if specified in YML
+    #     if (
+    #         self.cfg["addGCPs"]["enabled"]
+    #         and self.cfg["addGCPs"]["optimize_w_gcps_only"]
+    #     ):
+    #         n_cameras = len(self.doc.chunk.cameras)
+    #         for i in range(0, n_cameras):
+    #             self.doc.chunk.cameras[i].reference.enabled = False
 
-        # Currently only optimizes the default parameters, which is not all possible parameters
-        self.doc.chunk.optimizeCameras(
-            adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-        )
+    #     # Currently only optimizes the default parameters, which is not all possible parameters
+    #     self.doc.chunk.optimizeCameras(
+    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
+    #     )
 
-        # get an ending time stamp
-        timer1b = time.time()
+    #     # get an ending time stamp
+    #     timer1b = time.time()
 
-        # calculate difference between end and start time to 1 decimal place
-        time1 = diff_time(timer1b, timer1a)
+    #     # calculate difference between end and start time to 1 decimal place
+    #     time1 = diff_time(timer1b, timer1a)
 
-        # record results to file
-        with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Optimize cameras", time1]) + "\n")
+    #     # record results to file
+    #     with open(self.log_file, "a") as file:
+    #         file.write(MetashapeWorkflowLefolab.sep.join(["Optimize cameras", time1]) + "\n")
 
-        self.doc.save()
+    #     self.doc.save()
 
-        return True
+    #     return True
 
     # def filter_points_usgs_part1(self):
 
