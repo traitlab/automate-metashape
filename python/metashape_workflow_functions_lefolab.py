@@ -1,16 +1,13 @@
 #### Import libraries
 import datetime
 import glob
+import Metashape
 import os
 import platform
 import re
-
-# Import the fuctionality we need to make time stamps to measure performance
-import time
-
-### Import the Metashape functionality
-import Metashape
 import shutil
+import sys
+import time
 import yaml
 
 
@@ -223,11 +220,10 @@ class MetashapeWorkflowLefolab:
             )  # extracts file base name from path
             mission_id, _ = os.path.splitext(file_basename)  # removes extension
 
-        ## Project file example to make: "projectID_YYYYMMDDtHHMM-jobID.psx"
+        ## Project file example: "missionID_YYYY-MM-DDtHHMM.psx"
         timestamp = stamp_time()
         self.run_id = mission_id
         self.run_id_with_time = "_".join([mission_id, timestamp])
-        # TODO: If there is a slurm JobID, append to time (separated with "-", not "_"). This will keep jobs initiated in the same minute distinct
 
         project_file = os.path.join(
             self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"])
@@ -251,12 +247,13 @@ class MetashapeWorkflowLefolab:
         else:
             # Initialize a chunk, set its CRS as specified
             chunk = self.doc.addChunk()
+            chunk.label = mission_id
             chunk.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
             # chunk.marker_crs = Metashape.CoordinateSystem(
             #     self.cfg["addGCPs"]["gcp_crs"]
             # )
 
-        # Save doc doc as new project (even if we opened an existing project, save as a separate one so the existing project remains accessible in its original state)
+        # Save doc as new project (even if we opened an existing project, save as a separate one so the existing project remains accessible in its original state)
         self.doc.save(project_file)
 
         """
@@ -269,22 +266,41 @@ class MetashapeWorkflowLefolab:
         # https://slurm.schedmd.com/sbatch.html#lbAI
         with open(self.log_file, "a") as file:
 
-            # write a line with the Metashape version
             file.write(MetashapeWorkflowLefolab.sep.join(["Project", self.run_id]) + "\n")
-            file.write(
-                MetashapeWorkflowLefolab.sep.join(
-                    ["Agisoft Metashape Professional Version", Metashape.app.version]
-                )
-                + "\n"
-            )
-            # write a line with the date and time
-            file.write(
-                MetashapeWorkflowLefolab.sep.join(["Processing started", stamp_time()]) + "\n"
-            )
-            # write a line with CPU info - if possible, improve the way the CPU info is found / recorded
+            file.write(MetashapeWorkflowLefolab.sep.join(["Agisoft Metashape Professional Version", Metashape.app.version]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Processing started", stamp_time()]) + "\n")
             file.write(MetashapeWorkflowLefolab.sep.join(["Node", platform.node()]) + "\n")
-            file.write(MetashapeWorkflowLefolab.sep.join(["CPU", platform.processor()]) + "\n")
-            # write two lines with GPU info: count and model names - this takes multiple steps to make it look clean in the end
+            try:
+                with open('/proc/cpuinfo', 'r') as cpuinfo:
+                    for line in cpuinfo:
+                        if 'model name' in line:
+                            cpu_model = line.split(':')[1].strip()
+                            file.write(MetashapeWorkflowLefolab.sep.join(["CPU Model", cpu_model]) + "\n")
+                            break
+            except:
+                file.write(MetashapeWorkflowLefolab.sep.join(["CPU Model", platform.processor()]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["CPU Cores", str(os.cpu_count())]) + "\n")
+            try:
+                with open('/proc/meminfo', 'r') as meminfo:
+                    for line in meminfo:
+                        if line.startswith('MemTotal'):
+                            ram_kb = int(line.split()[1])
+                            ram_gb = round(ram_kb / (1024**2), 2)
+                            file.write(MetashapeWorkflowLefolab.sep.join(["Total RAM (GB)", str(ram_gb)]) + "\n")
+                            break
+            except:
+                file.write(MetashapeWorkflowLefolab.sep.join(["Total RAM", "Unable to determine"]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Operating System", platform.system() + " " + platform.release()]) + "\n")
+            try:
+                with open('/etc/os-release', 'r') as os_release:
+                    for line in os_release:
+                        if line.startswith('PRETTY_NAME'):
+                            os_name = line.split('=')[1].strip().strip('"')
+                            file.write(MetashapeWorkflowLefolab.sep.join(["OS Distribution", os_name]) + "\n")
+                            break
+            except:
+                pass
+            file.write(MetashapeWorkflowLefolab.sep.join(["Python Version", platform.python_version()]) + "\n")
 
     def enable_and_log_gpu(self):
         """
@@ -306,12 +322,9 @@ class MetashapeWorkflowLefolab:
         gpu_mask = Metashape.app.gpu_mask
 
         with open(self.log_file, "a") as file:
-            file.write(
-                MetashapeWorkflowLefolab.sep.join(["Number of GPUs Found", str(gpucount)])
-                + "\n"
-            )
+            file.write(MetashapeWorkflowLefolab.sep.join(["Number of GPUs Found", str(gpucount)]) + "\n")
             file.write(MetashapeWorkflowLefolab.sep.join(["GPU Model", gpustring]) + "\n")
-            file.write(MetashapeWorkflowLefolab.sep.join(["GPU Mask", str(gpu_mask)]) + "\n")
+            # file.write(MetashapeWorkflowLefolab.sep.join(["GPU Mask", str(gpu_mask)]) + "\n")
 
             # If a GPU exists but is not enabled, enable the 1st one
             if (gpucount > 0) and (gpu_mask == 0):
