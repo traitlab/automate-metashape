@@ -46,7 +46,7 @@ def stamp_time():
     """
     Format the timestamps as needed
     """
-    stamp = datetime.datetime.now().strftime("%Y%m%dT%H%M")
+    stamp = datetime.datetime.now().strftime("%Y-%m-%dT%H%M")
     return stamp
 
 
