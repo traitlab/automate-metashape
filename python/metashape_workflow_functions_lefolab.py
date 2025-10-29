@@ -52,10 +52,20 @@ def stamp_time():
 
 def diff_time(t2, t1):
     """
-    Give a end and start time, subtract, and round
+    Give a end and start time, subtract, and format as HH:MM:SS
     """
-    total = str(round(t2 - t1, 1))
-    return total
+    total_seconds = int(t2 - t1)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    
+    # Format based on what's applicable
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    elif minutes > 0:
+        return f"{minutes}:{seconds:02d}"
+    else:
+        return f"{seconds}s"
 
 
 # Used by add_gcps function
