@@ -28,7 +28,7 @@ def parse_args():
     )
     parser.add_argument(
         "-c",
-        "--config_file",
+        "--config-file",
         default=default_config_file,
         help="Path to a yaml config file.\n"
         + "If not provided, default is 'config/config_lefolab_default.yml'.",
@@ -148,7 +148,7 @@ meta = MetashapeWorkflowLefolab(config_file=args.config_file, override_dict=args
 meta.run()
 
 # Move the output files to conrad_upload if the output path is the default one
-if not args.gcps:
+if not args.add_gcps:
     if args.output_path == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/":
         source_path = args.output_path
         destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
