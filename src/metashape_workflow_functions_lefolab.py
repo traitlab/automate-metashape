@@ -104,7 +104,7 @@ class MetashapeWorkflowLefolab:
         self.log_file = None
         self.run_id = None
         self.cfg = None
-        # Parse the yaml confif
+        # Parse the yaml config
         self.read_yaml()
         # Apply any manual overrides
         self.override_config(override_dict)

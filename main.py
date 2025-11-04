@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 # File for running a metashape workflow
 
-# Derek Young and Alex Mandel
-# University of California, Davis
-# 2021
-# Adapted by Antoine Caron-Guay, for Lefolab, 2025
-
 import argparse
 import os
 import re
 from argparse import RawTextHelpFormatter
-from python.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
-from python.utilis import calculate_median_coordinates, calculate_utm_epsg
+from src.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
+from src.utilis import calculate_median_coordinates, calculate_utm_epsg
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
 

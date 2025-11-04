@@ -18,7 +18,7 @@ manual_config_file = Path(
 
 # Load custom modules and config file: slightly different depending whether running interactively or via command line
 try:  # running interactively (in linux) or command line (windows)
-    from python.metashape_workflow_functions import MetashapeWorkflow
+    from src.metashape_workflow_functions import MetashapeWorkflow
 except:  # running from command line (in linux) or interactively (windows)
     from metashape_workflow_functions import MetashapeWorkflow
 
