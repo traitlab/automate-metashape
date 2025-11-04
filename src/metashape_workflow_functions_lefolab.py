@@ -1586,8 +1586,25 @@ class MetashapeWorkflowLefolab:
 
         # Cleanup project files if specified
         if self.cfg.get("delete_project") == True:
+            project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
+            project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
+            
             del self.doc  # Close the Metashape project and remove the lock file
-            shutil.rmtree(self.cfg["project_path"])
-            print("Project files deleted.")
+            
+            if os.path.exists(project_file):
+                os.remove(project_file)
+                print(f"Deleted project file: {project_file}")
+            
+            # Delete the .files directory if it exists
+            if os.path.exists(project_files_dir):
+                shutil.rmtree(project_files_dir)
+                print(f"Deleted project files directory: {project_files_dir}")
+            
+            # Delete the log file
+            if os.path.exists(self.log_file):
+                os.remove(self.log_file)
+                print(f"Deleted log file: {self.log_file}")
+            
+            print("Project files deleted (output files preserved).")
 
         return True
