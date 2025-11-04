@@ -58,9 +58,9 @@ def diff_time(t2, t1):
     
     # Format based on what's applicable
     if hours > 0:
-        return f"{hours}:{minutes:02d}:{seconds:02d}"
+        return f"{hours}h{minutes:02d}m{seconds:02d}s"
     elif minutes > 0:
-        return f"{minutes}:{seconds:02d}"
+        return f"{minutes}m{seconds:02d}s"
     else:
         return f"{seconds}s"
 
@@ -132,6 +132,8 @@ class MetashapeWorkflowLefolab:
         """
         Execute metashape workflow steps based on config file
         """
+        self.processing_start_time = time.time()
+        
         self.project_setup()
 
         self.enable_and_log_gpu()
@@ -1557,6 +1559,13 @@ class MetashapeWorkflowLefolab:
             file.write(
                 MetashapeWorkflowLefolab.sep.join(["Run Completed", stamp_time()]) + "\n"
             )
+            
+            if hasattr(self, 'processing_start_time'):
+                processing_end_time = time.time()
+                total_time = diff_time(processing_end_time, self.processing_start_time)
+                file.write(
+                    MetashapeWorkflowLefolab.sep.join(["Total Processing Time", total_time]) + "\n"
+                )
 
         # open run configuration again. We can't just use the existing self.cfg file because its objects had already been converted to Metashape objects (they don't write well)
         with open(self.config_file) as file:

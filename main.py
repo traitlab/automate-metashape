@@ -63,7 +63,7 @@ def parse_args():
         "-gcps",
         "--add-gcps",
         action="store_true",
-        help="Pause processeing after photos alignment to allow GCPs to be added using the GUI, then rerun with --after-gcps to continue.",
+        help="Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --after-gcps to continue.",
     )
     parser.add_argument(
         "--after-gcps",
