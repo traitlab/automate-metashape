@@ -11,30 +11,35 @@ import time
 import yaml
 
 
-#### Helper functions
+def resolve_metashape_object(name):
+    """
+    Resolve a dotted Metashape object name (e.g., "Metashape.MosaicBlending") 
+    into the actual Metashape object.
+    """
+    if not name.startswith("Metashape."):
+        raise ValueError(f"Invalid Metashape object name: {name}")
+    
+    parts = name.split(".")[1:]
+    obj = Metashape
+    for part in parts:
+        obj = getattr(obj, part)
+    return obj
+
 def convert_objects(a_dict):
     """
-    Convert strings that refer to metashape objects (e.g. "Metashape.MoasicBlending") into metashape objects
-
-    Based on
-    https://stackoverflow.com/a/25896596/237354
+    Convert strings that refer to metashape objects (e.g. "Metashape.MosaicBlending") 
+    into metashape objects.
     """
     for k, v in a_dict.items():
         if not isinstance(v, dict):
             if isinstance(v, str):
-                # TODO look for Metashape.
-                if (
-                    v
-                    and "Metashape" in v
-                    and not ("path" in k)
-                    and not ("project" in k)
-                    and not ("name" in k)
-                ):  # allow "path" and "project" and "name" keys (e.g. "photoset_path" and "mission_id") from YAML to include "Metashape" (e.g., Metashape in the filename)
-                    a_dict[k] = eval(v)
+                # Allow "path", "project", and "name" keys to include "Metashape" in their values
+                if v and "Metashape" in v and not any(x in k for x in ("path", "project", "name")):
+                    a_dict[k] = resolve_metashape_object(v)
             elif isinstance(v, list):
-                # skip if no item in list have metashape, else convert string to metashape object
-                if any("Metashape" in item for item in v):
-                    a_dict[k] = [eval(item) for item in v if ("Metashape" in item)]
+                # Convert list items that contain "Metashape"
+                if any("Metashape" in item for item in v if isinstance(item, str)):
+                    a_dict[k] = [resolve_metashape_object(item) for item in v if isinstance(item, str) and "Metashape" in item]
         else:
             convert_objects(v)
 
