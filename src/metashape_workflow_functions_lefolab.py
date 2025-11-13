@@ -1,6 +1,6 @@
+import copy
 import datetime
 import glob
-import Metashape
 import os
 import platform
 import re
@@ -8,6 +8,8 @@ import shutil
 import sys
 import time
 import yaml
+
+import Metashape
 
 
 def resolve_metashape_object(name):
@@ -120,17 +122,10 @@ class MetashapeWorkflowLefolab:
             if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
                 self.add_photos()
 
-            # if self.cfg["calibrateReflectance"]["enabled"]:
-            #     self.calibrate_reflectance()
-
             # Align photos
             if self.cfg["alignPhotos"]["enabled"]:
                 self.align_photos()
                 self.reset_region()
-
-        # if self.cfg["filterPointsUSGS"]["enabled"]:
-        #     self.filter_points_usgs_part1()
-        #     self.reset_region()
 
         # Add GCPs manually via GUI if specified
         if self.cfg.get("add_gcps"):
@@ -140,38 +135,14 @@ class MetashapeWorkflowLefolab:
         if self.cfg.get("after_gcps"):
             self.after_gcps()
 
-        # if self.cfg["addGCPs"]["enabled"]:
-        #     self.add_gcps()
-        #     self.reset_region()
-
-        # if self.cfg["optimizeCameras"]["enabled"]:
-        #     self.optimize_cameras()
-        #     self.reset_region()
-
-        # if self.cfg["filterPointsUSGS"]["enabled"]:
-        #     self.filter_points_usgs_part2()
-        #     self.reset_region()
-
-        # if self.cfg["exportCameras"]["enabled"]:
-        #     self.export_cameras()
-
         if self.cfg["buildDepthMaps"]["enabled"]:
             self.build_depth_maps()
 
         if self.cfg["buildPointCloud"]["enabled"]:
             self.build_point_cloud()
 
-        # if self.cfg["buildModel"]["enabled"]:
-        #     self.build_model()
-
         # For this step, the check for whether it is enabled in the config happens inside the function, because there are two steps (DEM and ortho), each of which can be enabled independently
         self.build_dem_orthomosaic()
-
-        # if self.cfg["images_path_secondary"] != "":
-        #     self.add_align_secondary_photos()
-
-            # if self.cfg["exportCameras"]["enabled"]:
-            #     self.export_cameras()
 
         if not self.cfg["quick_process"]:
             self.build_depth_maps_highdis()
@@ -190,23 +161,13 @@ class MetashapeWorkflowLefolab:
         Create the project
         Start a log file
         """
-
         # Ensure output path exists
         os.makedirs(self.cfg["output_path"], exist_ok=True)
 
         # Ensure project path exists
         os.makedirs(self.cfg["project_path"], exist_ok=True)
 
-        ### Set a filename template for project files and output files based on the 'mission_id' key of the config YML
-        ## BUT if the value for mission_id is "from_config_filename", then use the config filename for the run name.
-
         mission_id = self.cfg["mission_id"]
-
-        if mission_id == "from_config_filename" or mission_id == "":
-            file_basename = os.path.basename(
-                self.config_file
-            )  # extracts file base name from path
-            mission_id, _ = os.path.splitext(file_basename)  # removes extension
 
         ## Project file example: "missionID_YYYY-MM-DDtHHMM.psx"
         timestamp = stamp_time()
@@ -223,7 +184,6 @@ class MetashapeWorkflowLefolab:
         """
         Create a doc and a chunk
         """
-
         # create a handle to the Metashape object
         self.doc = (Metashape.Document())  # When running via Metashape, can use: doc = Metashape.app.document
 
@@ -245,11 +205,6 @@ class MetashapeWorkflowLefolab:
         """
         Log specs except for GPU
         """
-
-        # log Metashape version, CPU specs, time, and project location to results file
-        # open the results file
-        # TODO: records the Slurm values for actual cpus and ram allocated
-        # https://slurm.schedmd.com/sbatch.html#lbAI
         with open(self.log_file, "a") as file:
 
             file.write(MetashapeWorkflowLefolab.sep.join(["Project", self.run_id]) + "\n")
@@ -292,7 +247,6 @@ class MetashapeWorkflowLefolab:
         """
         Enables GPU and logs GPU specs
         """
-
         gpustringraw = str(Metashape.app.enumGPUDevices())
         gpucount = gpustringraw.count("name': '")
         gpustring = ""
@@ -344,10 +298,6 @@ class MetashapeWorkflowLefolab:
         True, this is a secondary set of photos to be aligned only, after all photogrammetry products
         have been produced from the primary set of photos.
         """
-
-        # if secondary:
-        #     images_paths = self.cfg["images_path_secondary"]
-        # else:
         images_paths = self.cfg["images_path"]
 
         # If it's a single string (i.e. one directory), make it a list of one string so we can iterate
@@ -444,136 +394,6 @@ class MetashapeWorkflowLefolab:
 
         return True
 
-    # def calibrate_reflectance(self):
-    #     # TODO: Handle failure to find panels, or mulitple panel images by returning error to user.
-    #     self.doc.chunk.locateReflectancePanels()
-    #     self.doc.chunk.loadReflectancePanelCalibration(
-    #         os.path.join(
-    #             self.cfg["images_path"],
-    #             "calibration",
-    #             self.cfg["calibrateReflectance"]["panel_filename"],
-    #         )
-    #     )
-    #     # self.doc.chunk.calibrateReflectance(use_reflectance_panels=True,use_sun_sensor=True)
-    #     self.doc.chunk.calibrateReflectance(
-    #         use_reflectance_panels=self.cfg["calibrateReflectance"][
-    #             "use_reflectance_panels"
-    #         ],
-    #         use_sun_sensor=self.cfg["calibrateReflectance"]["use_sun_sensor"],
-    #     )
-    #     self.doc.save()
-
-    #     return True
-
-    # def add_gcps(self):
-    #     """
-    #     Add GCPs (GCP coordinates and the locations of GCPs in individual photos.
-    #     See the helper script (and the comments therein) for details on how to prepare the data needed by this function: R/prep_gcps.R
-    #     """
-
-    #     # Determine the location of the GCPs file, which is also the base path to prepend to the GCP
-    #     # camera label (relative to what's specified in the GCPs file, which is a relative path), to
-    #     # make it into an absolute path to match the label of the camera in the Metashape. Note the
-    #     # difference between the two camera labels: one is the camera label specified in the GCPs file
-    #     # (relative path), and one is the camera label in the Metashape (absolute). Currently, this
-    #     # assumes that all of the GCPs apply to the first provided folder of cameras (i.e., the only
-    #     # folder provided, or the first folder provided if multiple are provided) -- and that this is
-    #     # the folder containing the GCP definition file. TODO: Tolerate GCPs split across multiple
-    #     # folders of input images:
-    #     # https://github.com/open-forest-observatory/automate-metashape-2/issues/49.
-
-    #     images_paths = self.cfg["images_path"]
-
-    #     # If it's a single string (i.e. one directory), make it a list of one string so we can take the
-    #     # first element using the same operation we would use on a list of strings
-    #     if isinstance(images_paths, str):
-    #         images_paths = [images_paths]
-
-    #     # Take the first folder and assume it's the one with the GCPs file
-    #     images_path = images_paths[0]
-
-    #     ## Tag specific pixels in specific images where GCPs are located
-    #     path = os.path.join(images_path, "gcps", "prepared", "gcp_imagecoords_table.csv")
-    #     file = open(path)
-    #     content = file.read().splitlines()
-
-    #     for line in content:
-    #         marker_label, camera_label, x_proj, y_proj = line.split(",")
-    #         if (
-    #             marker_label[0] == '"'
-    #         ):  # if it's in quotes (from saving CSV in Excel), remove quotes
-    #             marker_label = marker_label[
-    #                 1:-1
-    #             ]  # need to get it out of the two pairs of quotes
-    #         if (
-    #             camera_label[0] == '"'
-    #         ):  # if it's in quotes (from saving CSV in Excel), remove quotes
-    #             camera_label = camera_label[1:-1]
-
-    #         marker = get_marker(self.doc.chunk, marker_label)
-    #         if not marker:
-    #             marker = self.doc.chunk.addMarker()
-    #             marker.label = marker_label
-
-    #         # Prepend the image path to the GCP's camera label to make it an absolute path
-    #         camera_label = os.path.join(images_path, camera_label)
-
-    #         camera = get_camera(self.doc.chunk, camera_label)
-    #         if not camera:
-    #             print(camera_label + " camera not found in project")
-    #             continue
-
-    #         marker.projections[camera] = Metashape.Marker.Projection(
-    #             (float(x_proj), float(y_proj)), True
-    #         )
-
-    #     ## Assign real-world coordinates to each GCP
-    #     path = os.path.join(images_path, "gcps", "prepared", "gcp_table.csv")
-
-    #     file = open(path)
-    #     content = file.read().splitlines()
-
-    #     for line in content:
-    #         marker_label, world_x, world_y, world_z = line.split(",")
-    #         if (
-    #             marker_label[0] == '"'
-    #         ):  # if it's in quotes (from saving CSV in Excel), remove quotes
-    #             marker_label = marker_label[
-    #                 1:-1
-    #             ]  # need to get it out of the two pairs of quotes
-
-    #         marker = get_marker(self.doc.chunk, marker_label)
-    #         if not marker:
-    #             marker = self.doc.chunk.addMarker()
-    #             marker.label = marker_label
-
-    #         marker.reference.location = (float(world_x), float(world_y), float(world_z))
-    #         marker.reference.accuracy = (
-    #             self.cfg["addGCPs"]["marker_location_accuracy"],
-    #             self.cfg["addGCPs"]["marker_location_accuracy"],
-    #             self.cfg["addGCPs"]["marker_location_accuracy"],
-    #         )
-
-    #     self.doc.chunk.marker_location_accuracy = (
-    #         self.cfg["addGCPs"]["marker_location_accuracy"],
-    #         self.cfg["addGCPs"]["marker_location_accuracy"],
-    #         self.cfg["addGCPs"]["marker_location_accuracy"],
-    #     )
-    #     self.doc.chunk.marker_projection_accuracy = self.cfg["addGCPs"][
-    #         "marker_projection_accuracy"
-    #     ]
-
-    #     self.doc.save()
-
-    #     return True
-
-    # def export_cameras(self):
-    #     output_file = os.path.join(
-    #         self.cfg["output_path"], self.run_id + "_cameras.xml"
-    #     )
-    #     # Defaults to xml format, which is the only one we've used so far
-    #     self.doc.chunk.exportCameras(path=output_file)
-
     def align_photos(self):
         """
         Match photos, align cameras, optimize cameras
@@ -628,42 +448,6 @@ class MetashapeWorkflowLefolab:
 
         return True
 
-    # def optimize_cameras(self):
-    #     """
-    #     Optimize cameras
-    #     """
-
-    #     # get a beginning time stamp
-    #     timer1a = time.time()
-
-    #     # Disable camera locations as reference if specified in YML
-    #     if (
-    #         self.cfg["addGCPs"]["enabled"]
-    #         and self.cfg["addGCPs"]["optimize_w_gcps_only"]
-    #     ):
-    #         n_cameras = len(self.doc.chunk.cameras)
-    #         for i in range(0, n_cameras):
-    #             self.doc.chunk.cameras[i].reference.enabled = False
-
-    #     # Currently only optimizes the default parameters, which is not all possible parameters
-    #     self.doc.chunk.optimizeCameras(
-    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-    #     )
-
-    #     # get an ending time stamp
-    #     timer1b = time.time()
-
-    #     # calculate difference between end and start time to 1 decimal place
-    #     time1 = diff_time(timer1b, timer1a)
-
-    #     # record results to file
-    #     with open(self.log_file, "a") as file:
-    #         file.write(MetashapeWorkflowLefolab.sep.join(["Optimize cameras", time1]) + "\n")
-
-    #     self.doc.save()
-
-    #     return True
-
     def add_gcps(self):
         """
         Pause processing and continue with GUI to add GCPs manually
@@ -703,139 +487,6 @@ class MetashapeWorkflowLefolab:
 
         self.doc.save()
 
-    # def filter_points_usgs_part1(self):
-
-    #     # get a beginning time stamp
-    #     timer1a = time.time()
-
-    #     self.doc.chunk.optimizeCameras(
-    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-    #     )
-
-    #     rec_thresh_percent = self.cfg["filterPointsUSGS"]["rec_thresh_percent"]
-    #     rec_thresh_absolute = self.cfg["filterPointsUSGS"]["rec_thresh_absolute"]
-    #     proj_thresh_percent = self.cfg["filterPointsUSGS"]["proj_thresh_percent"]
-    #     proj_thresh_absolute = self.cfg["filterPointsUSGS"]["proj_thresh_absolute"]
-    #     reproj_thresh_percent = self.cfg["filterPointsUSGS"]["reproj_thresh_percent"]
-    #     reproj_thresh_absolute = self.cfg["filterPointsUSGS"]["reproj_thresh_absolute"]
-
-    #     fltr = Metashape.TiePoints.Filter()
-    #     fltr.init(self.doc.chunk, Metashape.TiePoints.Filter.ReconstructionUncertainty)
-    #     values = fltr.values.copy()
-    #     values.sort()
-    #     thresh = values[int(len(values) * (1 - rec_thresh_percent / 100))]
-    #     if thresh < rec_thresh_absolute:
-    #         thresh = rec_thresh_absolute  # don't throw away too many points if they're all good
-    #     fltr.removePoints(thresh)
-
-    #     self.doc.chunk.optimizeCameras(
-    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-    #     )
-
-    #     fltr = Metashape.TiePoints.Filter()
-    #     fltr.init(self.doc.chunk, Metashape.TiePoints.Filter.ProjectionAccuracy)
-    #     values = fltr.values.copy()
-    #     values.sort()
-    #     thresh = values[int(len(values) * (1 - proj_thresh_percent / 100))]
-    #     if thresh < proj_thresh_absolute:
-    #         thresh = proj_thresh_absolute  # don't throw away too many points if they're all good
-    #     fltr.removePoints(thresh)
-
-    #     self.doc.chunk.optimizeCameras(
-    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-    #     )
-
-    #     fltr = Metashape.TiePoints.Filter()
-    #     fltr.init(self.doc.chunk, Metashape.TiePoints.Filter.ReprojectionError)
-    #     values = fltr.values.copy()
-    #     values.sort()
-    #     thresh = values[int(len(values) * (1 - reproj_thresh_percent / 100))]
-    #     if thresh < reproj_thresh_absolute:
-    #         thresh = reproj_thresh_absolute  # don't throw away too many points if they're all good
-    #     fltr.removePoints(thresh)
-
-    #     self.doc.chunk.optimizeCameras(
-    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-    #     )
-
-    #     # get an ending time stamp
-    #     timer1b = time.time()
-
-    #     # calculate difference between end and start time to 1 decimal place
-    #     time1 = diff_time(timer1b, timer1a)
-
-    #     # record results to file
-    #     with open(self.log_file, "a") as file:
-    #         file.write(
-    #             MetashapeWorkflow.sep.join(["USGS filter points part 1", time1]) + "\n"
-    #         )
-
-    #     self.doc.save()
-
-    # def filter_points_usgs_part2(self):
-
-    #     # get a beginning time stamp
-    #     timer1a = time.time()
-
-    #     self.doc.chunk.optimizeCameras(
-    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-    #     )
-
-    #     reproj_thresh_percent = self.cfg["filterPointsUSGS"]["reproj_thresh_percent"]
-    #     reproj_thresh_absolute = self.cfg["filterPointsUSGS"]["reproj_thresh_absolute"]
-
-    #     fltr = Metashape.TiePoints.Filter()
-    #     fltr.init(self.doc.chunk, Metashape.TiePoints.Filter.ReprojectionError)
-    #     values = fltr.values.copy()
-    #     values.sort()
-    #     thresh = values[int(len(values) * (1 - reproj_thresh_percent / 100))]
-    #     if thresh < reproj_thresh_absolute:
-    #         thresh = reproj_thresh_absolute  # don't throw away too many points if they're all good
-    #     fltr.removePoints(thresh)
-
-    #     self.doc.chunk.optimizeCameras(
-    #         adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"]
-    #     )
-
-    #     # get an ending time stamp
-    #     timer1b = time.time()
-
-    #     # calculate difference between end and start time to 1 decimal place
-    #     time1 = diff_time(timer1b, timer1a)
-
-    #     # record results to file
-    #     with open(self.log_file, "a") as file:
-    #         file.write(
-    #             MetashapeWorkflow.sep.join(["USGS filter points part 2", time1]) + "\n"
-    #         )
-
-    #     self.doc.save()
-
-    # def classify_ground_points(self):
-
-    #     # get a beginning time stamp for the next step
-    #     timer_a = time.time()
-
-    #     self.doc.chunk.point_cloud.classifyGroundPoints(
-    #         max_angle=self.cfg["classifyGroundPoints"]["max_angle"],
-    #         max_distance=self.cfg["classifyGroundPoints"]["max_distance"],
-    #         cell_size=self.cfg["classifyGroundPoints"]["cell_size"],
-    #     )
-
-    #     # get an ending time stamp for the previous step
-    #     timer_b = time.time()
-
-    #     # calculate difference between end and start time to 1 decimal place
-    #     time_tot = diff_time(timer_b, timer_a)
-
-    #     self.doc.save()
-
-    #     # record results to file
-    #     with open(self.log_file, "a") as file:
-    #         file.write(
-    #             MetashapeWorkflow.sep.join(["Classify Ground Points", time_tot]) + "\n"
-    #         )
-
     def build_depth_maps(self):
         ### Build depth maps
 
@@ -867,7 +518,6 @@ class MetashapeWorkflowLefolab:
         """
         Build point cloud
         """
-
         ### Build point cloud
 
         # get a beginning time stamp for the next step
