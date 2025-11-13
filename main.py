@@ -48,6 +48,12 @@ def parse_args():
         + "If not provided, it will be extracted from the images path.",
     )
     parser.add_argument(
+        "--input-crs",
+        help="CRS EPSG code for input photos.\n"
+        + "By default, set to EPSG::4326.\n"
+        + "To change in rare cases where RTK or NTRIP provider used a different datum.",
+    )
+    parser.add_argument(
         "-crs",
         "--project-crs",
         help="CRS EPSG code that project outputs should be in.\n"

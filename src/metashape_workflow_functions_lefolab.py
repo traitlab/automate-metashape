@@ -234,7 +234,7 @@ class MetashapeWorkflowLefolab:
             # Initialize a chunk, set its CRS as specified
             chunk = self.doc.addChunk()
             chunk.label = mission_id
-            chunk.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
+            chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
             # chunk.marker_crs = Metashape.CoordinateSystem(
             #     self.cfg["addGCPs"]["gcp_crs"]
             # )

@@ -6,7 +6,7 @@ def calculate_utm_epsg(latitude, longitude):
     """Calculate the EPSG code for the UTM zone based on latitude and longitude."""
     zone = int((longitude + 180) / 6) + 1
     hemisphere = '6' if latitude >= 0 else '7'
-    return f"EPSG:32{hemisphere}{zone:02d}"
+    return f"EPSG::32{hemisphere}{zone:02d}"
 
 def get_coordinates_from_image(image_path):
     """Get latitude and longitude from the image metadata."""
