@@ -7,6 +7,7 @@ import re
 from argparse import RawTextHelpFormatter
 from src.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
 from src.utilis import calculate_median_coordinates, calculate_utm_epsg
+from src.model.config import load_config
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
 
@@ -96,41 +97,23 @@ def parse_args():
 
     args = parser.parse_args()
 
-    if args.config_file == default_config_file and args.images_path:
+    if args.config_file == default_config_file and args.images_path and args.mission_id is None:
         # Extract the last part of the images path to use as mission_id if not provided
-        if args.mission_id is None:
-            images_path = args.images_path
-            mission_id = os.path.basename(os.path.normpath(images_path))
-            # Validate mission_id format
-            mission_id_pattern = r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$"
-            if not re.match(mission_id_pattern, mission_id):
-                raise ValueError(
-                    f"Invalid mission_id format from images path: {mission_id}. "
-                    "The mission_id should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'. "
-                    "Please specify a valid --mission-id."
-                )
+        images_path = args.images_path
+        mission_id = os.path.basename(os.path.normpath(images_path))
+        mission_id_pattern = r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$"
+        if not re.match(mission_id_pattern, mission_id):
+            raise ValueError(
+                f"Could not extract valid mission_id from images path: '{mission_id}'."
+                "mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
+                "Please specify a valid mission_id using --mission-id."
+            )
+        else:
             args.mission_id = mission_id
 
-        # Extract year from the mission_id (first 4 characters)
-        mission_year = args.mission_id[:4]
-        # Assign default paths if not provided
-        if args.project_path is None:
-            args.project_path = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}"
-        if args.output_path is None:
-            args.output_path = f"{args.project_path}/metashape/"
+    return args
 
-        # Determine project CRS if not provided
-        if args.project_crs is None:
-            # Calculate median coordinates from all images
-            median_latitude, median_longitude = calculate_median_coordinates(args.images_path)
-            args.project_crs = calculate_utm_epsg(median_latitude, median_longitude)
-
-        return args, mission_year
-    
-    else:
-        return args, None
-
-args, mission_year = parse_args()
+args = parse_args()
 
 # Check if required parameters are provided or appropriate config file is used
 required_params = {
@@ -142,17 +125,36 @@ if args.config_file == default_config_file:
         if getattr(args, param) is None:
             raise ValueError(error_message)
 
-# Initialize the workflow instance with the configuration file and the dictionary representation of CLI overrides
-meta = MetashapeWorkflowLefolab(config_file=args.config_file, override_dict=args.__dict__)
+# Validate config using Pydantic model
+try:
+    # Only apply CLI overrides when using default config
+    if args.config_file == default_config_file:
+        validated_config, config_dict = load_config(
+            config_file=args.config_file,
+            override_dict=args.__dict__
+        )
+    else:
+        # Don't apply CLI overrides when using custom config
+        validated_config, config_dict = load_config(
+            config_file=args.config_file,
+            override_dict=None
+        )
+except Exception as e:
+    print(f"\nConfiguration validation failed: {e}\n")
+    raise
+
+# Initialize the workflow instance with validated config dictionary
+meta = MetashapeWorkflowLefolab(config_file=config_dict)
 
 # Run the Metashape workflow
 meta.run()
 
 # Move the output files to conrad_upload if the output path is the default one
-if not args.add_gcps:
-    if args.output_path == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{args.mission_id}/metashape/":
-        source_path = args.output_path
-        destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{args.mission_id}/"
+if not config_dict['add_gcps']:
+    mission_year = config_dict['mission_id'][:4]
+    if config_dict['output_path'] == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{config_dict['mission_id']}/metashape/":
+        source_path = config_dict['output_path']
+        destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{config_dict['mission_id']}/"
         os.makedirs(destination_path, exist_ok=True)
         os.system(f"mv {source_path}* {destination_path}")
         print(f"Output files moved to {destination_path}")

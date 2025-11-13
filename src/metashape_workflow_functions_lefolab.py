@@ -75,34 +75,16 @@ class MetashapeWorkflowLefolab:
     def __init__(
         self,
         config_file,
-        override_dict,
     ):
         """
         Initializes an instance of the MetashapeWorkflowLefolab class based on the config file given
-        """
-        self.config_file = config_file
-        self.override_dict = override_dict
+        """       
+        self.config_file = copy.deepcopy(config_file) # Store config for logging (before conversion to Metashape objects)
+        self.cfg = config_file
         self.doc = None
         self.log_file = None
         self.run_id = None
-        self.cfg = None
-        # Parse the yaml config
-        self.read_yaml()
-        # Apply any manual overrides
-        self.override_config(override_dict)
-        # Convert the objects in the config to metashape objects
         convert_objects(self.cfg)
-
-    def read_yaml(self):
-        with open(self.config_file, "r") as ymlfile:
-            self.cfg = yaml.load(ymlfile, Loader=yaml.SafeLoader)
-
-    def override_config(self, override_dict):
-        # Remove any override options that are None
-        override_dict = {k: v for k, v in override_dict.items() if v is not None}
-
-        # Update any of the fields in the override dict to that value
-        self.cfg.update(override_dict)
 
     #### Functions for each major step in Metashape
 
@@ -1115,54 +1097,6 @@ class MetashapeWorkflowLefolab:
         self.doc.save()
 
         return True
-    
-    # def add_align_secondary_photos(self):
-    #     """
-    #     Add and align a second set of photos, to be aligned only. The main use case for this currently
-    #     is to be able to build all photogrammetry products from the primary set of photos (e.g., a nadir
-    #     mission), but to also estimate the positions of a secondary set of photos (e.g., oblique photos)
-    #     to use for multiview object detection/classification.
-    #     """
-
-    #     if self.cfg["alignPhotos"]["reset_alignment"] == True:
-    #         raise ValueError(
-    #             "For aligning secondary photos, reset_alignment must be False."
-    #         )
-    #     if self.cfg["alignPhotos"]["keep_keypoints"] == False:
-    #         raise ValueError(
-    #             "For aligning secondary photos, keep_keypoints must be True."
-    #         )
-
-    #     # get a beginning time stamp for the next step
-    #     timer2a = time.time()
-
-    #     # Add the secondary photos
-    #     self.add_photos(secondary=True)
-
-    #     # get an ending time stamp for the previous step
-    #     timer2b = time.time()
-
-    #     # calculate difference between end and start time to 1 decimal place
-    #     time2 = diff_time(timer2b, timer2a)
-
-    #     # record results to file
-    #     with open(self.log_file, "a") as file:
-    #         file.write(
-    #             MetashapeWorkflow.sep.join(["Add secondary photos", time2]) + "\n"
-    #         )
-
-    #     # Save the transform matrix
-    #     matrix_saved = self.doc.chunk.transform.matrix
-
-    #     # Align the secondary photos (really, align all photos, but only the secondary photos will be
-    #     # affected because Metashape only matches and aligns photos that were not already
-    #     # matched/aligned, assuming keep_keypoints and reset_alignment were set as required).
-    #     self.align_photos()
-
-    #     # Restore the saved transform matrix
-    #     self.doc.chunk.transform.matrix = matrix_saved
-
-    #     self.doc.save()
 
     def export_report(self):
         """
@@ -1193,18 +1127,10 @@ class MetashapeWorkflowLefolab:
                     MetashapeWorkflowLefolab.sep.join(["Total Processing Time", total_time]) + "\n"
                 )
 
-        # open run configuration again. We can't just use the existing self.cfg file because its objects had already been converted to Metashape objects (they don't write well)
-        with open(self.config_file) as file:
-            config_full = yaml.safe_load(file)
-
-        # add values from the override dict
-        override_dict = {k: v for k, v in self.override_dict.items() if v is not None}
-        config_full.update(override_dict)
-
-        # write the run configuration to the log file
+        # Write the run configuration to the log file
         with open(self.log_file, "a") as file:
             file.write("\n\n### CONFIGURATION ###\n")
-            documents = yaml.dump(config_full, file, default_flow_style=False)
+            yaml.dump(self.config_file, file, default_flow_style=False, sort_keys=False)
             file.write("### END CONFIGURATION ###\n")
 
         # Cleanup project files if specified
