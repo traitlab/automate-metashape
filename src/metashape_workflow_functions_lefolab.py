@@ -1,4 +1,3 @@
-#### Import libraries
 import datetime
 import glob
 import Metashape
@@ -43,7 +42,6 @@ def convert_objects(a_dict):
         else:
             convert_objects(v)
 
-
 def stamp_time():
     """
     Format the timestamps as needed
@@ -51,17 +49,16 @@ def stamp_time():
     stamp = datetime.datetime.now().strftime("%Y-%m-%dT%H%M")
     return stamp
 
-
 def diff_time(t2, t1):
     """
-    Give a end and start time, subtract, and format as HH:MM:SS
+    Give a end and start time, subtract, and format.
     """
     total_seconds = int(t2 - t1)
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
     seconds = total_seconds % 60
     
-    # Format based on what's applicable
+    # Format based on value
     if hours > 0:
         return f"{hours}h{minutes:02d}m{seconds:02d}s"
     elif minutes > 0:
@@ -70,29 +67,7 @@ def diff_time(t2, t1):
         return f"{seconds}s"
 
 
-# # Used by add_gcps function
-# def get_marker(chunk, label):
-#     for marker in chunk.markers:
-#         if marker.label == label:
-#             return marker
-#     return None
-
-
-# # Used by add_gcps function
-# def get_camera(chunk, label):
-#     for camera in chunk.cameras:
-#         if camera.label.lower() == label.lower():
-#             return camera
-#     return None
-
-
-# Set the log file name-value separator
-# Chose ; as : is in timestamps
-# TODO: Consider moving log to json/yaml formatting using a dict
-
-
 class MetashapeWorkflowLefolab:
-
     sep = ": "
 
     def __init__(

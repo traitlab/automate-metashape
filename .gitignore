@@ -129,3 +129,4 @@ dev/
 # Workspace files
 *.code-workspace
 **/.vscode/
+*.pdf
