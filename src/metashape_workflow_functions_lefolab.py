@@ -99,10 +99,6 @@ class MetashapeWorkflowLefolab:
         # Remove any override options that are None
         override_dict = {k: v for k, v in override_dict.items() if v is not None}
 
-        # Disable HighDis processing if specified in the CLI
-        if override_dict.get("quick_process") is True:
-            self.cfg["HighDis"]["enabled"] = False
-
         # Update any of the fields in the override dict to that value
         self.cfg.update(override_dict)
 
@@ -177,7 +173,7 @@ class MetashapeWorkflowLefolab:
             # if self.cfg["exportCameras"]["enabled"]:
             #     self.export_cameras()
 
-        if self.cfg["HighDis"]["enabled"]:
+        if not self.cfg["quick_process"]:
             self.build_depth_maps_highdis()
             self.build_point_cloud_highdis()
             self.build_dem_highdis()
@@ -904,7 +900,7 @@ class MetashapeWorkflowLefolab:
 
         ### Export points
 
-        if self.cfg["buildPointCloud"]["export"] and self.cfg["HighDis"]["enabled"] == False:
+        if self.cfg["buildPointCloud"]["export"] and self.cfg["quick_process"]:
 
             output_file = os.path.join(
                 self.cfg["output_path"], self.run_id + "_pg.copc.laz"
@@ -1055,7 +1051,7 @@ class MetashapeWorkflowLefolab:
             output_file = os.path.join(
                 self.cfg["output_path"], self.run_id + "_dsm.tif"
             )
-            if self.cfg["buildDem"]["export"] and self.cfg["HighDis"]["enabled"] == False:
+            if self.cfg["buildDem"]["export"] and self.cfg["quick_process"]:
                 self.doc.chunk.exportRaster(
                     path=output_file,
                     projection=projection,
@@ -1554,9 +1550,6 @@ class MetashapeWorkflowLefolab:
         # add values from the override dict
         override_dict = {k: v for k, v in self.override_dict.items() if v is not None}
         config_full.update(override_dict)
-
-        if self.override_dict.get("quick_process") is True:
-            config_full["HighDis"]["enabled"] = False
 
         # write the run configuration to the log file
         with open(self.log_file, "a") as file:
