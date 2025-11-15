@@ -76,7 +76,6 @@ class MetashapePointClass(str, Enum):
 class AddPhotosConfig(BaseModel):
     """Configuration for adding photos"""
     enabled: bool = True
-    separate_calibration_per_path: bool = False
     multispectral: bool = False
     use_xmp_accuracy: bool = True
     photos_accuracy: float = Field(default=5.0, gt=0)

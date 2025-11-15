@@ -324,27 +324,7 @@ class MetashapeWorkflowLefolab:
             path = camera.photo.path
             camera.label = path
 
-        if self.cfg["addPhotos"]["separate_calibration_per_path"]:
-            # Assign a different (new) sensor (i.e. independent calibration) to each group of photos
-            for grp in self.doc.chunk.camera_groups:
-
-                # Get the template for the sensor from the first photo in the group
-                for cam in self.doc.chunk.cameras:
-                    if cam.group == grp:
-                        sensor = cam.sensor
-                        break
-
-                self.doc.chunk.addSensor(self.doc.chunk.cameras[0].sensor)
-                sensor = self.doc.chunk.sensors[-1]
-
-                for cam in self.doc.chunk.cameras:
-                    if cam.group == grp:
-                        cam.sensor = sensor
-
-            # Remove the first (deafult) sensor, which should no longer be assigned to any photos
-            self.doc.chunk.remove(self.doc.chunk.sensors[0])
-
-        ## If specified, change the accuracy of the cameras for custom value
+        # If specified, change the accuracy of the cameras for custom value
         if self.cfg["addPhotos"]["use_xmp_accuracy"] == False:
             for cam in self.doc.chunk.cameras:
                 cam.reference.location_accuracy = Metashape.Vector(
