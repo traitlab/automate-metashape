@@ -148,13 +148,3 @@ meta = MetashapeWorkflowLefolab(config_file=config_dict)
 
 # Run the Metashape workflow
 meta.run()
-
-# Move the output files to conrad_upload if the output path is the default one
-if not config_dict['add_gcps']:
-    mission_year = config_dict['mission_id'][:4]
-    if config_dict['output_path'] == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{config_dict['mission_id']}/metashape/":
-        source_path = config_dict['output_path']
-        destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{config_dict['mission_id']}/"
-        os.makedirs(destination_path, exist_ok=True)
-        os.system(f"mv {source_path}* {destination_path}")
-        print(f"Output files moved to {destination_path}")

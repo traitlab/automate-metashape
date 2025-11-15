@@ -1113,8 +1113,17 @@ class MetashapeWorkflowLefolab:
             yaml.dump(self.config_file, file, default_flow_style=False, sort_keys=False)
             file.write("### END CONFIGURATION ###\n")
 
-        # Cleanup project files if specified
-        if self.cfg.get("delete_project") == True:
+        # Move the output files to conrad_upload if the output path is the default one
+        mission_year = self.cfg['mission_id'][:4]
+        if self.cfg['output_path'] == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{self.cfg['mission_id']}/metashape/":
+            source_path = self.cfg['output_path']
+            destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{self.cfg['mission_id']}/"
+            os.makedirs(destination_path, exist_ok=True)
+            os.system(f"mv {source_path}* {destination_path}")
+            print(f"Output files moved to {destination_path}")
+
+        # Cleanup project files if required
+        if self.cfg["delete_project"]:
             project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
             project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
             
