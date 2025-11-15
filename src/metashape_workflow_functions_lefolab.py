@@ -135,10 +135,9 @@ class MetashapeWorkflowLefolab:
 
     def project_setup(self):
         """
-        Create output and project paths, if they don't exist
-        Define a project ID based on specified project name and timestamp
-        Define a project filename and a log filename
-        Create the project
+        Create output and project paths
+        Define a project ID, project filename and a log filename
+        Create the Metashape project
         Start a log file
         """
         # Ensure output path exists
@@ -149,12 +148,12 @@ class MetashapeWorkflowLefolab:
 
         mission_id = self.cfg["mission_id"]
 
-        ## Project file example: "missionID_YYYY-MM-DDtHHMM.psx"
+        # Project file name format: "missionID_YYYY-MM-DDtHHMM.psx"
         timestamp = stamp_time()
         self.run_id = mission_id
         self.run_id_with_time = "_".join([mission_id, timestamp])
 
-        project_file = os.path.join(
+        self.project_file = os.path.join(
             self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"])
         )
         self.log_file = os.path.join(
@@ -164,8 +163,8 @@ class MetashapeWorkflowLefolab:
         """
         Create a doc and a chunk
         """
-        # create a handle to the Metashape object
-        self.doc = (Metashape.Document())  # When running via Metashape, can use: doc = Metashape.app.document
+        # Create a handle to the Metashape object
+        self.doc = (Metashape.Document())  # When running via Metashape GUI, use: doc = Metashape.app.document
 
         # If specified, open existing project
         if self.cfg["load_project"] != "":
@@ -195,8 +194,8 @@ class MetashapeWorkflowLefolab:
             chunk.label = mission_id
             chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
 
-        # Save doc as new project (even if we opened an existing project, save as a separate one so the existing project remains accessible in its original state)
-        self.doc.save(project_file)
+        # Save doc as new project (even if an existing project was opened, save as a separate one)
+        # self.doc.save(project_file)
 
         """
         Log specs except for GPU
@@ -290,9 +289,7 @@ class MetashapeWorkflowLefolab:
 
     def add_photos(self, secondary=False):
         """
-        Add photos to project and change their labels to include their containing folder. Secondary: if
-        True, this is a secondary set of photos to be aligned only, after all photogrammetry products
-        have been produced from the primary set of photos.
+        Add photos to project and change their labels to their full path.
         """
         images_paths = self.cfg["images_path"]
 
@@ -306,20 +303,13 @@ class MetashapeWorkflowLefolab:
             grp = self.doc.chunk.addCameraGroup()
 
             ## Get paths to all the project photos
-            a = glob.iglob(
-                os.path.join(images_path, "**", "*.*"), recursive=True
-            )  # (([jJ][pP][gG])|([tT][iI][fF]))
+            a = glob.iglob(os.path.join(images_path, "**", "*.*"), recursive=True)
             b = [path for path in a]
             photo_files = [
-                x
-                for x in b
-                if (
-                    re.search("(.tif$)|(.jpg$)|(.TIF$)|(.JPG$)", x)
-                    and (not re.search("dem_usgs.tif", x))
-                )
+                x for x in b 
+                if re.search(r"\.(tif|jpg)$", x, re.IGNORECASE)
             ]
 
-            ## Add them
             if self.cfg["addPhotos"]["multispectral"]:
                 self.doc.chunk.addPhotos(
                     photo_files, layout=Metashape.MultiplaneLayout, group=grp
@@ -333,7 +323,7 @@ class MetashapeWorkflowLefolab:
                                          load_xmp_antenna=self.cfg["addPhotos"]["load_xmp_antenna"],
                                          )
 
-        ## Need to change the label on each camera so that it includes the containing folder(s)
+        # Change the label of cameras to show full path
         for camera in self.doc.chunk.cameras:
             path = camera.photo.path
             camera.label = path
@@ -366,18 +356,14 @@ class MetashapeWorkflowLefolab:
             
             sensor.fixed_params=self.cfg["cameracalibration"]["fixed_parameters"]
 
-        self.doc.save()
+        #self.doc.save()
 
         return True
 
     def align_photos(self):
         """
-        Match photos, align cameras, optimize cameras
+        Match photos and align cameras
         """
-
-        #### Align photos
-
-        # get a beginning time stamp
         timer1a = time.time()
 
         # Align cameras
@@ -398,15 +384,12 @@ class MetashapeWorkflowLefolab:
             subdivide_task=self.cfg["subdivide_task"],
             reset_alignment=self.cfg["alignPhotos"]["reset_alignment"],
         )
-        self.doc.save()
+        #self.doc.save()
 
-        # get an ending time stamp
         timer1b = time.time()
-
-        # calculate difference between end and start time to 1 decimal place
         time1 = diff_time(timer1b, timer1a)
 
-        # record processing time to file
+        # Record processing time to log file
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Align Photos", time1]) + "\n")
 
@@ -416,7 +399,6 @@ class MetashapeWorkflowLefolab:
         """
         Reset the region and make it much larger than the points; necessary because if points go outside the region, they get clipped when saving
         """
-
         self.doc.chunk.resetRegion()
         region_dims = self.doc.chunk.region.size
         region_dims[2] *= 3
@@ -441,9 +423,9 @@ class MetashapeWorkflowLefolab:
             elif old_path.startswith("/mnt/nfs/conrad/"):
                 new_path = old_path.replace("/mnt/nfs/conrad/", "//conrad-irbv.irbv.umontreal.ca/")
                 camera.photo.path = new_path
-            # Not working on Windows paths currently
 
-        self.doc.save()
+        self.doc.save(self.project_file)
+
         print("\n[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, then rerun with --after-gcps to resume processing.")
         gui_path = self.doc.path.replace('/mnt/nfs/conrad/', '//conrad-irbv.irbv.umontreal.ca/').replace('/', '\\')
         print(f"[INFO] Command to rerun: {' '.join(sys.argv)} --load-project {self.doc.path}")
@@ -452,12 +434,11 @@ class MetashapeWorkflowLefolab:
 
 
     def build_depth_maps(self):
-        ### Build depth maps
-
-        # get a beginning time stamp for the next step
+        """
+        Build depth maps
+        """
         timer2a = time.time()
 
-        # build depth maps only instead of also building the point cloud ##?? what does
         self.doc.chunk.buildDepthMaps(
             downscale=self.cfg["buildDepthMaps"]["downscale"],
             filter_mode=self.cfg["buildDepthMaps"]["filter_mode"],
@@ -466,28 +447,21 @@ class MetashapeWorkflowLefolab:
             subdivide_task=self.cfg["subdivide_task"],
         )
 
-        # get an ending time stamp for the previous step
         timer2b = time.time()
-
-        # calculate difference between end and start time to 1 decimal place
         time2 = diff_time(timer2b, timer2a)
 
-        # record results to file
+        # Record processing time to log file
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time2]) + "\n")
 
-        self.doc.save()
+        self.doc.save(self.project_file)
 
     def build_point_cloud(self):
         """
         Build point cloud
         """
-        ### Build point cloud
-
-        # get a beginning time stamp for the next step
         timer3a = time.time()
 
-        # build point cloud
         self.doc.chunk.buildPointCloud(
             max_neighbors=self.cfg["buildPointCloud"]["max_neighbors"],
             keep_depth=self.cfg["buildPointCloud"]["keep_depth"],
@@ -496,13 +470,10 @@ class MetashapeWorkflowLefolab:
             replace_asset=True,
         )
 
-        # get an ending time stamp for the previous step
         timer3b = time.time()
-
-        # calculate difference between end and start time to 1 decimal place
         time3 = diff_time(timer3b, timer3a)
 
-        # record results to file
+        # Record processing time to log file
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud", time3]) + "\n")
 
@@ -542,98 +513,20 @@ class MetashapeWorkflowLefolab:
 
         return True
 
-    # def build_model(self):
-    #     """
-    #     Build and export the model
-    #     """
-
-    #     start_time = time.time()
-    #     # Build the mesh
-    #     self.doc.chunk.buildModel(
-    #         surface_type=Metashape.Arbitrary,
-    #         interpolation=Metashape.EnabledInterpolation,
-    #         face_count=self.cfg["buildModel"]["face_count"],
-    #         face_count_custom=self.cfg["buildModel"][
-    #             "face_count_custom"
-    #         ],  # Only used if face_count is custom
-    #         source_data=Metashape.DepthMapsData,
-    #     )
-
-    #     time_taken = diff_time(time.time(), start_time)
-
-    #     # record results to file
-    #     with open(self.log_file, "a") as file:
-    #         file.write(MetashapeWorkflow.sep.join(["Build Model", time_taken]) + "\n")
-
-    #     # Save the model
-    #     self.doc.save()
-
-    #     if self.cfg["buildModel"]["export_georeferenced"]:
-    #         output_file = os.path.join(
-    #             self.cfg["output_path"],
-    #             self.run_id
-    #             + "_model_georeferenced."
-    #             + self.cfg["buildModel"]["export_extension"],
-    #         )
-    #         self.doc.chunk.exportModel(path=output_file)
-
-    #     if self.cfg["buildModel"]["export_local"]:
-    #         # Wipe the CRS and transform so it aligns with the cameras
-    #         # The approach was recommended here: https://www.agisoft.com/forum/index.php?topic=8210.0
-    #         old_crs = self.doc.chunk.crs
-    #         old_transform_matrix = self.doc.chunk.transform.matrix
-    #         # Wipe the transform
-    #         self.doc.chunk.crs = None
-    #         self.doc.chunk.transform.matrix = None
-
-    #         # Export the transform
-    #         if self.cfg["buildModel"]["export_transform"]:
-    #             output_file = os.path.join(
-    #                 self.cfg["output_path"],
-    #                 self.run_id + "_local_model_transform.csv",
-    #             )
-
-    #             with open(output_file, "w") as fileh:
-    #                 # This is a row-major representation
-    #                 transform_tuple = tuple(old_transform_matrix)
-    #                 # Write each row in the the transform
-    #                 for i in range(4):
-    #                     fileh.write(
-    #                         ", ".join(str(transform_tuple[i * 4 : (i + 1) * 4]))
-    #                     )
-
-    #         # Export the model
-    #         output_file = os.path.join(
-    #             self.cfg["output_path"],
-    #             self.run_id
-    #             + "_model_local."
-    #             + self.cfg["buildModel"]["export_extension"],
-    #         )
-    #         self.doc.chunk.exportModel(path=output_file)
-
-    #         # Reset CRS and transform
-    #         self.doc.chunk.crs = old_crs
-    #         self.doc.chunk.transform.matrix = old_transform_matrix
-
-    #         self.doc.open(self.doc.path)
-
-    #     return True
-
     def build_dem_orthomosaic(self):
         """
         Build end export DEM
         """
-
         # # classify ground points if specified
         # if self.cfg["buildDem"]["classify_ground_points"]:
         #     self.classify_ground_points()
 
         if self.cfg["buildDem"]["enabled"]:
-            # prepping params for buildDem
+            # Params for buildDem
             projection = Metashape.OrthoProjection()
             projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
 
-            # prepping params for export
+            # Params for export
             compression = Metashape.ImageCompression()
             compression.tiff_big = self.cfg["buildDem"]["tiff_big"]
             compression.tiff_tiled = self.cfg["buildDem"]["tiff_tiled"]
@@ -655,7 +548,7 @@ class MetashapeWorkflowLefolab:
 
             self.doc.chunk.elevation.label = "DSM"
 
-            # record results to file
+            # Record processing time to log file
             with open(self.log_file, "a") as file:
                 file.write(
                     MetashapeWorkflowLefolab.sep.join(["Build DSM", time_taken])
@@ -775,13 +668,11 @@ class MetashapeWorkflowLefolab:
         Helper function called by build_dem_orthomosaic. build_export_orthomosaic builds and exports an ortho based on the current elevation data.
         build_dem_orthomosaic sets the current elevation data and calls build_export_orthomosaic (one or more times depending on how many orthomosaics requested)
 
-        Note that we have tried using the 'resolution' parameter of buildOrthomosaic, but it does not have any effect. An orthomosaic built onto a DSM always has a reslution of 1/4 the DSM, and one built onto the mesh has a resolution of ~the GSD.
+        Note that an orthomosaic built onto a DSM always has a reslution of 1/4 the DSM, and one built onto the mesh has a resolution of the GSD.
         """
+        timer4a = time.time()
 
-        # get a beginning time stamp for the next step
-        timer6a = time.time()
-
-        # prepping params for buildDem
+        # Params for buildOrthomosaic
         projection = Metashape.OrthoProjection()
         projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
 
@@ -795,15 +686,12 @@ class MetashapeWorkflowLefolab:
             replace_asset=True,
         )
 
-        # get an ending time stamp for the previous step
-        timer6b = time.time()
+        timer4b = time.time()
+        time4 = diff_time(timer4b, timer4a)
 
-        # calculate difference between end and start time to 1 decimal place
-        time6 = diff_time(timer6b, timer6a)
-
-        # record results to file
+        # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Orthomosaic", time6]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build Orthomosaic", time4]) + "\n")
 
         self.doc.save()
 
@@ -836,10 +724,10 @@ class MetashapeWorkflowLefolab:
         return True
 
     def build_depth_maps_highdis(self):
-        ### Build depth maps
-
-        # get a beginning time stamp for the next step
-        timer2a = time.time()
+        """
+        Build depth maps
+        """
+        timer5a = time.time()
 
         # build depth maps only instead of also building the point cloud ##?? what does
         self.doc.chunk.buildDepthMaps(
@@ -850,29 +738,21 @@ class MetashapeWorkflowLefolab:
             subdivide_task=self.cfg["subdivide_task"],
         )
 
-        # get an ending time stamp for the previous step
-        timer2b = time.time()
+        timer5b = time.time()
+        time5 = diff_time(timer5b, timer5a)
 
-        # calculate difference between end and start time to 1 decimal place
-        time2 = diff_time(timer2b, timer2a)
-
-        # record results to file
+        # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time2]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time5]) + "\n")
 
-        self.doc.save()
+        #self.doc.save()
 
     def build_point_cloud_highdis(self):
         """
         Build point cloud
         """
+        timer6a = time.time()
 
-        ### Build point cloud
-
-        # get a beginning time stamp for the next step
-        timer3a = time.time()
-
-        # build point cloud
         self.doc.chunk.buildPointCloud(
             max_neighbors=self.cfg["buildPointCloudHighDis"]["max_neighbors"],
             keep_depth=self.cfg["buildPointCloudHighDis"]["keep_depth"],
@@ -881,15 +761,12 @@ class MetashapeWorkflowLefolab:
             replace_asset=True,
         )
 
-        # get an ending time stamp for the previous step
-        timer3b = time.time()
+        timer6b = time.time()
+        time6 = diff_time(timer6b, timer6a)
 
-        # calculate difference between end and start time to 1 decimal place
-        time3 = diff_time(timer3b, timer3a)
-
-        # record results to file
+        # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud", time3]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud", time6]) + "\n")
 
         self.doc.save()
 
@@ -931,6 +808,7 @@ class MetashapeWorkflowLefolab:
         """
         Build end export DEM
         """
+        timer7a = time.time()
 
         # prepping params for buildDem
         projection = Metashape.OrthoProjection()
@@ -943,8 +821,6 @@ class MetashapeWorkflowLefolab:
         compression.tiff_overviews = self.cfg["buildDemHighDis"]["tiff_overviews"]
         compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
 
-        start_time = time.time()
-
         # call without point classes argument (Metashape then defaults to all classes)
         self.doc.chunk.buildDem(
             source_data=Metashape.PointCloudData,
@@ -954,14 +830,15 @@ class MetashapeWorkflowLefolab:
             replace_asset=True,
         )
 
-        time_taken = diff_time(time.time(), start_time)
+        timer7b = time.time()
+        time7 = diff_time(timer7b, timer7a)
 
         self.doc.chunk.elevation.label = "DSM-highdis"
 
-        # record results to file
+        # Record processing time to log file
         with open(self.log_file, "a") as file:
             file.write(
-                MetashapeWorkflowLefolab.sep.join(["Build DSM - HighDis", time_taken])
+                MetashapeWorkflowLefolab.sep.join(["Build DSM - HighDis", time7])
                 + "\n"
             )
 
@@ -1093,7 +970,7 @@ class MetashapeWorkflowLefolab:
 
     def finish_run(self):
         """
-        Finish run (i.e., write completed time to log)
+        Finish run (i.e., write completed time to log and save project)
         """
         # Update photo paths to be able to open project on GUI server if needed
         chunk = self.doc.chunk
@@ -1150,21 +1027,16 @@ class MetashapeWorkflowLefolab:
             project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
             project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
             
-            del self.doc  # Close the Metashape project and remove the lock file
-            
             if os.path.exists(project_file):
                 os.remove(project_file)
-                print(f"Deleted project file: {project_file}")
             
             # Delete the .files directory if it exists
             if os.path.exists(project_files_dir):
                 shutil.rmtree(project_files_dir)
-                print(f"Deleted project files directory: {project_files_dir}")
             
             # Delete the log file
             if os.path.exists(self.log_file):
                 os.remove(self.log_file)
-                print(f"Deleted log file: {self.log_file}")
             
             print("Project files deleted (output files preserved).")
 
