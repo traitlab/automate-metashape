@@ -67,23 +67,18 @@ def parse_args():
         help="Path to a camera calibration file (.xml).",
     )
     parser.add_argument(
-        "-gcps",
-        "--add-gcps",
+        "-g",
+        "--gcps",
         action="store_true",
-        help="Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --after-gcps to continue.",
+        help="Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --gcps to continue.",
     )
     parser.add_argument(
-        "--after-gcps",
-        action="store_true",
-        help="Continue processing after GCPs have been added with GUI.",
-    )
-    parser.add_argument(
-        "-load",
+        "-l",
         "--load-project",
         help="Path to a Metashape project file (.psx) to load.",
     )
     parser.add_argument(
-        "-quick",
+        "-q",
         "--quick-process",
         action="store_true",
         help="Faster processing by disabling High quality and Disable filtering options (HighDis).\n"

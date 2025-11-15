@@ -84,6 +84,7 @@ class MetashapeWorkflowLefolab:
         self.doc = None
         self.log_file = None
         self.run_id = None
+        self.after_gcps = False
         convert_objects(self.cfg)
 
     #### Functions for each major step in Metashape
@@ -99,7 +100,7 @@ class MetashapeWorkflowLefolab:
         self.enable_and_log_gpu()
 
         # Skip add_photos and align_photos if resuming after GCPs
-        if not self.cfg.get("after_gcps"):
+        if not self.after_gcps:
             # Add photos
             if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
                 self.add_photos()
@@ -110,12 +111,9 @@ class MetashapeWorkflowLefolab:
                 self.reset_region()
 
         # Add GCPs manually via GUI if specified
-        if self.cfg.get("add_gcps"):
+        if self.cfg["gcps"]:
             self.add_gcps()
             return
-
-        if self.cfg.get("after_gcps"):
-            self.after_gcps()
 
         if self.cfg["buildDepthMaps"]["enabled"]:
             self.build_depth_maps()
@@ -172,14 +170,30 @@ class MetashapeWorkflowLefolab:
         # If specified, open existing project
         if self.cfg["load_project"] != "":
             self.doc.open(self.cfg["load_project"])
+
+            # If cameras are already present, make sure they exist and their paths are identical to their labels
+            if self.doc.chunk.cameras:
+                for camera in self.doc.chunk.cameras:
+                    photo_path = camera.photo.path
+                    if not os.path.exists(photo_path):
+                        # If the path does not exist, try to set it to the label
+                        if os.path.exists(camera.label):
+                            camera.photo.path = camera.label
+                        else:
+                            raise FileNotFoundError(f"Photo path for camera '{camera.label}' does not exist: {photo_path}")
+                        
+            # If markers exist, set after_gcps to True
+            if self.doc.chunk.markers:
+                self.after_gcps = True
+                self.cfg["gcps"] = False
         else:
-            # Initialize a chunk, set its CRS as specified
+            # Use absolute paths for photos to solve path issues when opening with GUI
+            Metashape.app.settings.project_absolute_paths = True
+
+            # Initialize a chunk, set its label and CRS
             chunk = self.doc.addChunk()
             chunk.label = mission_id
             chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
-            # chunk.marker_crs = Metashape.CoordinateSystem(
-            #     self.cfg["addGCPs"]["gcp_crs"]
-            # )
 
         # Save doc as new project (even if we opened an existing project, save as a separate one so the existing project remains accessible in its original state)
         self.doc.save(project_file)
@@ -432,22 +446,10 @@ class MetashapeWorkflowLefolab:
         self.doc.save()
         print("\n[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, then rerun with --after-gcps to resume processing.")
         gui_path = self.doc.path.replace('/mnt/nfs/conrad/', '//conrad-irbv.irbv.umontreal.ca/').replace('/', '\\')
-        print(f"[INFO] Command to rerun: {' '.join(sys.argv).replace(' -gcps', '').replace(' -add-gcps', '')} -load {self.doc.path} --after-gcps")
+        print(f"[INFO] Command to rerun: {' '.join(sys.argv)} --load-project {self.doc.path}")
         print(f"[INFO] Open project on GUI server at: {gui_path}")
         return
 
-    def after_gcps(self):
-        """
-        Resume processing after GCPs have been added manually via GUI
-        """
-        chunk = self.doc.chunk
-
-        for camera in chunk.cameras:
-            if not camera.photo:
-                continue
-            camera.photo.path = camera.label
-
-        self.doc.save()
 
     def build_depth_maps(self):
         ### Build depth maps
@@ -1093,8 +1095,29 @@ class MetashapeWorkflowLefolab:
         """
         Finish run (i.e., write completed time to log)
         """
+        # Update photo paths to be able to open project on GUI server if needed
+        chunk = self.doc.chunk
+        
+        for camera in chunk.cameras:
+            if not camera.photo:
+                continue
+            old_path = camera.photo.path
+            
+            if old_path.startswith("/mnt/nfs/lefodata/"):
+                new_path = old_path.replace("/mnt/nfs/lefodata/", "//lefodata/")
+                camera.photo.path = new_path
+            elif old_path.startswith("/mnt/nfs/conrad/"):
+                new_path = old_path.replace("/mnt/nfs/conrad/", "//conrad-irbv.irbv.umontreal.ca/")
+                camera.photo.path = new_path
 
-        # finish local results log and close it for the last time
+        # Save the project
+        if not self.cfg["delete_project"]:
+            self.doc.save()
+        
+        # Close the Metashape project and remove the lock file 
+        del self.doc  
+
+        # Finish logging results
         with open(self.log_file, "a") as file:
             file.write(
                 MetashapeWorkflowLefolab.sep.join(["Run Completed", stamp_time()]) + "\n"

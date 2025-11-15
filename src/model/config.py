@@ -234,9 +234,8 @@ class MetashapeConfig(BaseModel):
     buildPointCloudHighDis: BuildPointCloudConfig = Field(default_factory=BuildPointCloudConfig)
     buildDemHighDis: BuildDemConfig = Field(default_factory=BuildDemConfig)
     
-    # GCP workflow flags
-    add_gcps: bool = False
-    after_gcps: bool = False
+    # GCP workflow flag
+    gcps: bool = False
 
     
     @field_validator('mission_id')

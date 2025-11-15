@@ -67,8 +67,7 @@ alignPhotos: # (Metashape: matchPhotos, alignCameras)
     keypoint_limit_per_mpx: 1000 # Default to 1000
     tiepoint_limit: 0 # Default to 4000, 0 for no limit
 
-add_gcps: False # Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --after-gcps to continue.
-after_gcps: False # Continue processing after GCPs have been added using the GUI.
+gcps: False # Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --gcps to continue.
 
 buildDepthMaps: # (Metashape: buildDepthMaps)
     enabled: True
