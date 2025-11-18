@@ -153,12 +153,12 @@ class MetashapeWorkflowLefolab:
         self.run_id = mission_id
         self.run_id_with_time = "_".join([mission_id, timestamp])
 
-        self.project_file = os.path.join(
-            self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"])
-        )
-        self.log_file = os.path.join(
-            self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"])
-        )
+        self.project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
+        self.log_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"]))
+
+        if os.path.exists(self.project_file) and not self.cfg["load_project"]:
+            print("[ERROR] Project with similar timestamp (" + timestamp + ") exists, retry in a minute")
+            sys.exit(1)
 
         """
         Create a doc and a chunk
@@ -426,7 +426,7 @@ class MetashapeWorkflowLefolab:
 
         self.doc.save(self.project_file)
 
-        print("\n[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, then rerun with --after-gcps to resume processing.")
+        print("[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, and rerun with --load-project and --gcps to resume processing.")
         gui_path = self.doc.path.replace('/mnt/nfs/conrad/', '//conrad-irbv.irbv.umontreal.ca/').replace('/', '\\')
         print(f"[INFO] Command to rerun: {' '.join(sys.argv)} --load-project {self.doc.path}")
         print(f"[INFO] Open project on GUI server at: {gui_path}")
@@ -1020,7 +1020,7 @@ class MetashapeWorkflowLefolab:
             destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{self.cfg['mission_id']}/"
             os.makedirs(destination_path, exist_ok=True)
             os.system(f"mv {source_path}* {destination_path}")
-            print(f"Output files moved to {destination_path}")
+            print(f"[INFO] Output files moved to {destination_path}")
 
         # Cleanup project files if required
         if self.cfg["delete_project"]:
@@ -1038,6 +1038,6 @@ class MetashapeWorkflowLefolab:
             if os.path.exists(self.log_file):
                 os.remove(self.log_file)
             
-            print("Project files deleted (output files preserved).")
+            print("[INFO] Project files deleted (output files preserved).")
 
         return True
