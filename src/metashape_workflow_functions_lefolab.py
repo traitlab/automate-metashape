@@ -157,8 +157,10 @@ class MetashapeWorkflowLefolab:
         self.log_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"]))
 
         if os.path.exists(self.project_file) and not self.cfg["load_project"]:
-            print("[ERROR] Project with similar timestamp (" + timestamp + ") exists, retry in a minute")
-            sys.exit(1)
+            raise FileExistsError(
+                f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}."
+                "Please retry in a minute or use --load-project to open the existing project."
+            )
 
         """
         Create a doc and a chunk
@@ -169,6 +171,12 @@ class MetashapeWorkflowLefolab:
         # If specified, open existing project
         if self.cfg["load_project"] != "":
             self.doc.open(self.cfg["load_project"])
+
+            # Raise error if the project does not have a chunk, or has multiple chunks
+            if len(self.doc.chunks) == 0:
+                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks.")
+            if len(self.doc.chunks) > 1:
+                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk.")
 
             # If cameras are already present, make sure they exist and their paths are identical to their labels
             if self.doc.chunk.cameras:
