@@ -200,6 +200,22 @@ class BuildOrthomosaicConfig(BaseModel):
     remove_after_export: bool = False
 
 
+class ThermalParametersConfig(BaseModel):
+    """Configuration for thermal image processing"""
+    emissivity: float = Field(default=0.957, ge=0.1, le=1.0)
+    humidity: Optional[float] = Field(default=None, ge=20, le=100)
+    distance: float = Field(default=25, ge=1, le=25)
+    reflection: Optional[float] = Field(default=None, ge=-50, le=500)
+    weather_station_path: str = "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat"
+    tz_input: str = "Australia/Perth"
+    
+    @field_validator('humidity', 'reflection')
+    @classmethod
+    def validate_optional_params(cls, v):
+        # Allow None or valid numeric values
+        return v
+
+
 class MetashapeConfig(BaseModel):
     """Main configuration model for Metashape workflow"""
     
@@ -236,6 +252,10 @@ class MetashapeConfig(BaseModel):
     
     # GCP workflow flag
     gcps: bool = False
+    
+    # Thermal processing
+    thermal: bool = False
+    thermal_parameters: ThermalParametersConfig = Field(default_factory=ThermalParametersConfig)
 
     
     @field_validator('mission_id')

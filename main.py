@@ -6,7 +6,6 @@ import os
 import re
 from argparse import RawTextHelpFormatter
 from src.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
-from src.utilis import calculate_median_coordinates, calculate_utm_epsg
 from src.model.config import load_config
 
 # ---- If this is a first run from the standalone python module, need to copy the license file from the full metashape install: from python import metashape_license_setup
@@ -83,6 +82,13 @@ def parse_args():
         action="store_true",
         help="Faster processing by disabling High quality and Disable filtering options (HighDis).\n"
         + "By default, High quality and Disable filtering options are enabled.",
+    )
+    parser.add_argument(
+        "-t",
+        "--thermal",
+        action="store_true",
+        help="Process thermal images using default parameters.\n"
+        + "By default, thermal images are disabled.",
     )
     parser.add_argument(
         "--delete-project",

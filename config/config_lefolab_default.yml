@@ -48,6 +48,15 @@ addPhotos: # (Metashape: addPhotos)
   load_xmp_accuracy: True
   load_xmp_antenna: True
 
+thermal: False # Are these thermal images? If True, transform to .tif format by using thermal parameters below.
+thermal_parameters:
+    emissivity: 0.957 # Range: 0.1-1.0 https://royalsocietypublishing.org/doi/pdf/10.1098/rsos.181281 (e.g., average 0.957 for vegetation)
+    humidity: null # Range: 20-100 %    Default: extract from weather station data
+    distance: 25 # Range: 1-25 m    Altitude - object height (set to 25 if camera-target-distance > 25 m)
+    reflection: null # Range: -50-500    Represents the temperature of the day    Default: extract from weather station data
+    weather_station_path: "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat" # Path to weather station data to extract humidity and reflected temperature. If not provided, default values of 70% humidity and 25C reflection temperature are used.
+    tz_input: "Australia/Perth" # Timezone of the input weather station data (to convert to UTC)
+
 camera_calibration_path: "" # Path to camera calibration file. If not provided, Metashape will ignore this step.
 cameracalibration:
     format: Metashape.CalibrationFormatXML # Options: CalibrationFormatXML, CalibrationFormatPix4D, CalibrationFormatOpenCV, etc.

@@ -81,8 +81,8 @@ def get_start_end_datetime(directory_path):
     Process all Timestamp files in a directory, convert GPS time to UTC time,
     filter out invalid timestamps (-259200.000000), and return begin and end UTC times.
     """
-    # Find all .MRK files in the directory
-    mrk_files = glob.glob(os.path.join(directory_path, "*.MRK"))
+    # Find all .MRK files in the directory recursively
+    mrk_files = glob.glob(os.path.join(directory_path, "**/*.MRK"), recursive=True)
     
     if not mrk_files:
         raise ValueError(f"No .MRK files found in {directory_path}")
