@@ -1,6 +1,8 @@
 import exifread
+import glob
 import os
 import statistics
+from datetime import datetime, timedelta
 
 def calculate_utm_epsg(latitude, longitude):
     """Calculate the EPSG code for the UTM zone based on latitude and longitude."""
@@ -59,3 +61,71 @@ def calculate_median_coordinates(images_path):
     median_longitude = statistics.median(longitudes)
 
     return median_latitude, median_longitude
+
+def gps2utc(gps_week, gps_seconds):
+    # GPS Epoch: January 6, 1980
+    gps_epoch = datetime(1980, 1, 6, 0, 0, 0)
+
+    # Compute GPS time
+    gps_time = gps_epoch + timedelta(weeks=gps_week, seconds=gps_seconds)
+
+    # Convert to UTC by subtracting leap seconds
+    leap_seconds = 18  # As of 2024; check if updated in future
+    utc_time = gps_time - timedelta(seconds=leap_seconds)
+
+    return utc_time
+
+def process_mrk_files(directory_path):
+    """
+    Process all .MRK files in a directory, convert GPS time to UTC time,
+    filter out invalid timestamps (-259200.000000), and return begin and end UTC times.
+    """
+    # Find all .MRK files in the directory
+    mrk_files = glob.glob(os.path.join(directory_path, "*.MRK"))
+    
+    if not mrk_files:
+        raise ValueError(f"No .MRK files found in {directory_path}")
+    
+    all_utc_times = []
+    
+    for mrk_file in mrk_files:
+        with open(mrk_file, 'r') as f:
+            for line in f:
+                # Skip empty lines or header lines
+                line = line.strip()
+                if not line or not line[0].isdigit():
+                    continue
+                
+                # Split the line by tabs or spaces
+                parts = line.split()
+                
+                if len(parts) < 3:
+                    continue
+                
+                try:
+                    # Extract GPS seconds of week (second field) and GPS week (third field)
+                    gps_ms_str = parts[1]
+                    gps_week_str = parts[2].strip('[]')  # Remove brackets if present
+                    
+                    gps_ms = float(gps_ms_str)
+                    gps_week = int(gps_week_str)
+                    
+                    # Filter out invalid GPS time (-259200.000000)
+                    if gps_ms == -259200.000000 or gps_ms < 0:
+                        continue
+                    
+                    # Convert to UTC
+                    utc_time = gps2utc(gps_week, gps_ms)
+                    all_utc_times.append(utc_time)
+                    
+                except (ValueError, IndexError) as e:
+                    # Skip lines that can't be parsed
+                    continue
+    
+    if not all_utc_times:
+        raise ValueError(f"No valid GPS times found in .MRK files in {directory_path}")
+    
+    # Sort times to get begin and end
+    all_utc_times.sort()
+    
+    return [all_utc_times[0], all_utc_times[-1]]
