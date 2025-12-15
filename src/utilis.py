@@ -1,8 +1,9 @@
 import exifread
 import glob
 import os
+import pandas as pd
 import statistics
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 def calculate_utm_epsg(latitude, longitude):
     """Calculate the EPSG code for the UTM zone based on latitude and longitude."""
@@ -75,9 +76,9 @@ def gps2utc(gps_week, gps_seconds):
 
     return utc_time
 
-def process_mrk_files(directory_path):
+def get_start_end_datetime(directory_path):
     """
-    Process all .MRK files in a directory, convert GPS time to UTC time,
+    Process all Timestamp files in a directory, convert GPS time to UTC time,
     filter out invalid timestamps (-259200.000000), and return begin and end UTC times.
     """
     # Find all .MRK files in the directory
@@ -129,3 +130,79 @@ def process_mrk_files(directory_path):
     all_utc_times.sort()
     
     return [all_utc_times[0], all_utc_times[-1]]
+
+def load_weather_data(file_path, tz_input):
+    # Read .dat file, skipping first metadata line, using second line as column names
+    weather = pd.read_csv(file_path, skiprows=[0], sep=',', decimal='.')
+    
+    # Delete rows 0 and 1 (units / non-data rows)
+    weather = weather.iloc[2:].reset_index(drop=True)
+    
+    # Convert all columns to numeric except TIMESTAMP and MetSENS_Status
+    exclude_cols = ['TIMESTAMP', 'MetSENS_Status']
+    for col in weather.columns:
+        if col not in exclude_cols:
+            weather[col] = pd.to_numeric(weather[col], errors='coerce')
+    
+    # Rename TIMESTAMP column
+    weather = weather.rename(columns={'TIMESTAMP': 'TIMESTAMP_LOCAL'})
+    
+    # Convert timestamp to datetime with specified timezone
+    weather['TIMESTAMP_LOCAL'] = pd.to_datetime(
+        weather['TIMESTAMP_LOCAL'],
+        format='%Y-%m-%d %H:%M:%S'
+    ).dt.tz_localize(tz_input)
+    
+    # Create UTC timestamp
+    weather['TIMESTAMP_UTC'] = weather['TIMESTAMP_LOCAL'].dt.tz_convert('UTC')
+    
+    # Remove rows with NA values
+    weather = weather.dropna()
+    
+    return weather
+
+def extract_weather_mean(weather_data, start_datetime, end_datetime):
+    """
+    Extract mean weather values for a given time window.
+    """    
+    # Ensure input datetimes are timezone-aware UTC
+    if start_datetime.tzinfo is None:
+        start_dt = start_datetime.replace(tzinfo=timezone.utc)
+    else:
+        start_dt = start_datetime.astimezone(timezone.utc)
+    
+    if end_datetime.tzinfo is None:
+        end_dt = end_datetime.replace(tzinfo=timezone.utc)
+    else:
+        end_dt = end_datetime.astimezone(timezone.utc)
+    
+    # Filter data for the time window using UTC timestamps
+    filtered = weather_data[
+        (weather_data['TIMESTAMP_UTC'] >= start_dt) &
+        (weather_data['TIMESTAMP_UTC'] <= end_dt)
+    ]
+    
+    if filtered.empty:
+        raise ValueError(f"No data found in the specified time window: {start_dt} to {end_dt} (UTC)")
+    
+    # Calculate means for numeric columns
+    numeric_cols = filtered.select_dtypes(include=['number']).columns
+    
+    # Exclude RECORD and BattV_Avg if they exist
+    exclude_cols = ['RECORD', 'BattV_Avg']
+    numeric_cols = [col for col in numeric_cols if col not in exclude_cols]
+    
+    means = filtered[numeric_cols].mean()
+    
+    # Create result dictionary
+    result = {
+        'start_LOCAL': filtered['TIMESTAMP_LOCAL'].min(),
+        'end_LOCAL': filtered['TIMESTAMP_LOCAL'].max(),
+        'start_UTC': filtered['TIMESTAMP_UTC'].min(),
+        'end_UTC': filtered['TIMESTAMP_UTC'].max(),
+    }
+    
+    # Add mean values
+    result.update(means.to_dict())
+    
+    return result
