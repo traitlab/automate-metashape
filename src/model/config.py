@@ -1,10 +1,12 @@
 """
 Configuration model for Metashape workflow using Pydantic for validation.
 """
-from typing import Optional, Union, List, Any
-from pydantic import BaseModel, Field, field_validator, model_validator
-from enum import Enum
 import re
+
+from datetime import datetime
+from enum import Enum
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Optional, Union, List, Any
 
 
 class MetashapeFiltering(str, Enum):
@@ -207,12 +209,24 @@ class ThermalParametersConfig(BaseModel):
     distance: float = Field(default=25, ge=1, le=25)
     reflection: Optional[float] = Field(default=None, ge=-50, le=500)
     weather_station_path: str = "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat"
-    tz_input: str = "Australia/Perth"
+    mission_start: Optional[str] = None
+    mission_end: Optional[str] = None
     
     @field_validator('humidity', 'reflection')
     @classmethod
     def validate_optional_params(cls, v):
         # Allow None or valid numeric values
+        return v
+    
+    @field_validator('mission_start', 'mission_end', mode='before')
+    @classmethod
+    def validate_datetime_format(cls, v):
+        if v is not None:
+            import datetime
+            try:
+                datetime.datetime.strptime(v, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                raise ValueError(f"Datetime must be in format 'YYYY-MM-DD HH:MM:SS', got: {v}")
         return v
 
 

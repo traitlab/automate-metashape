@@ -11,7 +11,7 @@ import time
 import yaml
 
 import Metashape
-from src.utilis import get_start_end_datetime, load_weather_data, extract_weather_mean
+from src.utilis import get_start_end_datetime_filename, load_weather_data, extract_weather_mean
 
 
 def resolve_metashape_object(name):
@@ -337,7 +337,8 @@ class MetashapeWorkflowLefolab:
         distance = thermal_params["distance"]
         reflection = thermal_params["reflection"]
         weather_station_path = thermal_params["weather_station_path"]
-        tz_input = thermal_params["tz_input"]
+        mission_start = thermal_params["mission_start"]
+        mission_end = thermal_params["mission_end"]
         
         # Ensure weather station path has /mnt/nfs prefix if needed
         if weather_station_path:
@@ -349,30 +350,36 @@ class MetashapeWorkflowLefolab:
             print("Extracting weather data from weather station...")
             
             try:
-                # Get mission start/end times from MRK files across all images paths
-                all_start_times = []
-                all_end_times = []
-                
-                for images_path in images_paths:
-                    start_utc, end_utc = get_start_end_datetime(images_path)
-                    all_start_times.append(start_utc)
-                    all_end_times.append(end_utc)
-                
-                # Get overall start and end from all paths
-                overall_start = min(all_start_times)
-                overall_end = max(all_end_times)
-                
-                print(f"  Mission time window: {overall_start} to {overall_end} (UTC)")
-                
+                if mission_start is None or mission_end is None:
+                    # Get mission start/end times from filenames across all images paths
+                    all_start_times = []
+                    all_end_times = []
+                    
+                    for images_path in images_paths:
+                        start_time, end_time = get_start_end_datetime_filename(images_path)
+                        all_start_times.append(start_time)
+                        all_end_times.append(end_time)
+                    
+                    # Get overall start and end from all paths
+                    mission_start = min(all_start_times)
+                    mission_end = max(all_end_times)
+                    
+                    print(f"  Mission time window: {mission_start} to {mission_end} (local time)")
+                else:
+                    # Use provided mission start/end times
+                    mission_start = datetime.datetime.strptime(mission_start, "%Y-%m-%d %H:%M:%S")
+                    mission_end = datetime.datetime.strptime(mission_end, "%Y-%m-%d %H:%M:%S")
+                    print(f"  Using provided mission time window: {mission_start} to {mission_end} (local time)")
+
                 # Load weather data
-                weather_data = load_weather_data(weather_station_path, tz_input)
+                weather_data = load_weather_data(weather_station_path)
                 
                 # Extract mean weather values
-                weather_mean = extract_weather_mean(weather_data, overall_start, overall_end)
+                weather_mean = extract_weather_mean(weather_data, mission_start, mission_end)
                 
                 # Use extracted values if not provided
                 if humidity is None:
-                    humidity = weather_mean.get('RH_Avg', 70.0)  # Default to 70 if column not found
+                    humidity = weather_mean.get('RH', 70.0)  # Default to 70 if column not found
                     print(f"  Extracted humidity: {humidity:.1f}%")
                 
                 if reflection is None:
@@ -391,7 +398,7 @@ class MetashapeWorkflowLefolab:
         
         # Process each images path
         for images_path in images_paths:
-            print(f"Processing images in: {images_path}")
+            print(f"Processing thermal images in: {images_path}")
             
             # Define output directory for calibrated thermal images
             out_dir = "/mnt/nfs/conrad/labolaliberte_upload/tmp/thermal/" + self.run_id + "/"

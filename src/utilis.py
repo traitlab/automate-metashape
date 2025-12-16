@@ -3,7 +3,7 @@ import glob
 import os
 import pandas as pd
 import statistics
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 def calculate_utm_epsg(latitude, longitude):
     """Calculate the EPSG code for the UTM zone based on latitude and longitude."""
@@ -76,7 +76,7 @@ def gps2utc(gps_week, gps_seconds):
 
     return utc_time
 
-def get_start_end_datetime(directory_path):
+def get_start_end_datetime_timestamp(directory_path):
     """
     Process all Timestamp files in a directory, convert GPS time to UTC time,
     filter out invalid timestamps (-259200.000000), and return begin and end UTC times.
@@ -131,7 +131,47 @@ def get_start_end_datetime(directory_path):
     
     return [all_utc_times[0], all_utc_times[-1]]
 
-def load_weather_data(file_path, tz_input):
+def get_start_end_datetime_filename(directory_path):
+    """
+    Extract start and end datetime from image filenames in a directory
+    using DJI filename format: DJI_YYYYMMDDHHMMSS_*_T.JPG.
+    """
+    import re
+    
+    # Find all thermal JPG files in the directory recursively
+    jpg_files = glob.glob(os.path.join(directory_path, "**/*_T.JPG"), recursive=True)
+    
+    if not jpg_files:
+        raise ValueError(f"No thermal image files (*_T.JPG) found in {directory_path}")
+    
+    all_datetimes = []
+    
+    # Pattern to match DJI_YYYYMMDDHHMMSS
+    pattern = re.compile(r'DJI_(\d{14})')
+    
+    for jpg_file in jpg_files:
+        filename = os.path.basename(jpg_file)
+        match = pattern.search(filename)
+        
+        if match:
+            datetime_str = match.group(1)
+            try:
+                # Parse datetime from filename (YYYYMMDDHHMMSS) as local time
+                dt = datetime.strptime(datetime_str, '%Y%m%d%H%M%S')
+                all_datetimes.append(dt)
+            except ValueError:
+                # Skip files with invalid datetime format
+                continue
+    
+    if not all_datetimes:
+        raise ValueError(f"No valid datetime found in filenames in {directory_path}")
+    
+    # Sort datetimes to get begin and end
+    all_datetimes.sort()
+    
+    return [all_datetimes[0], all_datetimes[-1]]
+
+def load_weather_data(file_path):
     # Read .dat file, skipping first metadata line, using second line as column names
     weather = pd.read_csv(file_path, skiprows=[0], sep=',', decimal='.')
     
@@ -151,11 +191,8 @@ def load_weather_data(file_path, tz_input):
     weather['TIMESTAMP_LOCAL'] = pd.to_datetime(
         weather['TIMESTAMP_LOCAL'],
         format='%Y-%m-%d %H:%M:%S'
-    ).dt.tz_localize(tz_input)
-    
-    # Create UTC timestamp
-    weather['TIMESTAMP_UTC'] = weather['TIMESTAMP_LOCAL'].dt.tz_convert('UTC')
-    
+    )
+      
     # Remove rows with NA values
     weather = weather.dropna()
     
@@ -164,26 +201,21 @@ def load_weather_data(file_path, tz_input):
 def extract_weather_mean(weather_data, start_datetime, end_datetime):
     """
     Extract mean weather values for a given time window.
-    """    
-    # Ensure input datetimes are timezone-aware UTC
-    if start_datetime.tzinfo is None:
-        start_dt = start_datetime.replace(tzinfo=timezone.utc)
-    else:
-        start_dt = start_datetime.astimezone(timezone.utc)
+    """
+    # Validate inputs are datetime objects
+    if not isinstance(start_datetime, datetime):
+        raise TypeError(f"start_datetime must be a datetime object, got {type(start_datetime)}")
+    if not isinstance(end_datetime, datetime):
+        raise TypeError(f"end_datetime must be a datetime object, got {type(end_datetime)}")
     
-    if end_datetime.tzinfo is None:
-        end_dt = end_datetime.replace(tzinfo=timezone.utc)
-    else:
-        end_dt = end_datetime.astimezone(timezone.utc)
-    
-    # Filter data for the time window using UTC timestamps
+    # Filter data for the time window using local timestamps
     filtered = weather_data[
-        (weather_data['TIMESTAMP_UTC'] >= start_dt) &
-        (weather_data['TIMESTAMP_UTC'] <= end_dt)
+        (weather_data['TIMESTAMP_LOCAL'] >= start_datetime) &
+        (weather_data['TIMESTAMP_LOCAL'] <= end_datetime)
     ]
     
     if filtered.empty:
-        raise ValueError(f"No data found in the specified time window: {start_dt} to {end_dt} (UTC)")
+        raise ValueError(f"No data found in the specified time window: {start_datetime} to {end_datetime} (local time)")
     
     # Calculate means for numeric columns
     numeric_cols = filtered.select_dtypes(include=['number']).columns
@@ -198,8 +230,6 @@ def extract_weather_mean(weather_data, start_datetime, end_datetime):
     result = {
         'start_LOCAL': filtered['TIMESTAMP_LOCAL'].min(),
         'end_LOCAL': filtered['TIMESTAMP_LOCAL'].max(),
-        'start_UTC': filtered['TIMESTAMP_UTC'].min(),
-        'end_UTC': filtered['TIMESTAMP_UTC'].max(),
     }
     
     # Add mean values
