@@ -19,11 +19,11 @@ delete_project: False # Should the Metashape project file be deleted after proce
 mission_id: ""
 
 # Input photos CRS EPSG code. Value should be "EPSG::4326" except in rare cases where RTK or NTRIP provider used a different datum.
-input_crs: "EPSG::4326"
+input_crs: "EPSG::7844"
 
 # Projected CRS EPSG code that project outputs should be in (projection should be in meter units and intended for the project area).
 # If blank, CRS will be determined from photo GPS data, using applicable UTM zone.
-project_crs: ""
+project_crs: "EPSG::7850"
 
 # Project to load. If blank, creates a new empty project.
 # Even if loading an existing project, all processing is saved as a new project. The original project file is not modified.
@@ -40,23 +40,23 @@ load_project: ""
 addPhotos: # (Metashape: addPhotos)
   enabled: True # This applies to the main photos specified in photo_path above. Secondary photos are always added and aligned if a path (or paths) is provided.
   multispectral: False # Is this a multispectral photo set? If RGB, set to False.
-  use_xmp_accuracy: True # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
-  photos_accuracy: 5 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
+  use_xmp_accuracy: False # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
+  photos_accuracy: 1 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
   load_reference: True
   load_xmp_calibration: True
   load_xmp_orientation: True
   load_xmp_accuracy: True
   load_xmp_antenna: True
 
-thermal: False # Are these thermal images? If True, transform to .tif format by using thermal parameters below.
+thermal: True # Are these thermal images? If True, transform to .tif format by using thermal parameters below.
 thermal_parameters:
     emissivity: 0.957 # Range: 0.1-1.0 https://royalsocietypublishing.org/doi/pdf/10.1098/rsos.181281 (e.g., average 0.957 for vegetation)
     humidity: null # Range: 20-100 %    Default: extract from weather station data
     distance: 25 # Range: 1-25 m    Altitude - object height (set to 25 if camera-target-distance > 25 m)
     reflection: null # Range: -50-500    Represents the temperature of the day    Default: extract from weather station data
     weather_station_path: "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat" # Path to weather station data to extract humidity and reflected temperature. If not provided, default values of 70% humidity and 25C reflection temperature are used.
-    mission_start: null # Format:"2024-06-01 00:00:00"    Start time of the flight mission in local time (to align with weather station data). If not provided, using the timestamp by filename of the first photo.
-    mission_end: null # Format:"2024-06-01 23:59:59"    End time of the flight mission in local time (to align with weather station data). IF not provided, using the timestamp by filename of the last photo.
+    mission_start: null # Format:"2024-06-01 00:00:00"    Start time of the flight mission in local time (to align with weather station data)
+    mission_end: null # Format:"2024-06-01 23:59:59"    End time of the flight mission in local time (to align with weather station data)
 
 camera_calibration_path: "" # Path to camera calibration file. If not provided, Metashape will ignore this step.
 cameracalibration:

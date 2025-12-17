@@ -5,11 +5,13 @@ import os
 import platform
 import re
 import shutil
+import subprocess
 import sys
 import time
 import yaml
 
 import Metashape
+from src.utilis import get_start_end_datetime_filename, load_weather_data, extract_weather_mean
 
 
 def resolve_metashape_object(name):
@@ -99,6 +101,10 @@ class MetashapeWorkflowLefolab:
 
         self.enable_and_log_gpu()
 
+        # Process thermal images if enabled
+        if self.cfg["thermal"]:
+            self.process_thermal_images()
+
         # Skip add_photos and align_photos if resuming after GCPs
         if not self.after_gcps:
             # Add photos
@@ -157,8 +163,10 @@ class MetashapeWorkflowLefolab:
         self.log_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"]))
 
         if os.path.exists(self.project_file) and not self.cfg["load_project"]:
-            print("[ERROR] Project with similar timestamp (" + timestamp + ") exists, retry in a minute")
-            sys.exit(1)
+            raise FileExistsError(
+                f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}."
+                "Please retry in a minute or use --load-project to open the existing project."
+            )
 
         """
         Create a doc and a chunk
@@ -169,6 +177,12 @@ class MetashapeWorkflowLefolab:
         # If specified, open existing project
         if self.cfg["load_project"] != "":
             self.doc.open(self.cfg["load_project"])
+
+            # Raise error if the project does not have a chunk, or has multiple chunks
+            if len(self.doc.chunks) == 0:
+                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks.")
+            if len(self.doc.chunks) > 1:
+                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk.")
 
             # If cameras are already present, make sure they exist and their paths are identical to their labels
             if self.doc.chunk.cameras:
@@ -285,6 +299,148 @@ class MetashapeWorkflowLefolab:
             "main/depth_max_gpu_multiplier", self.cfg["gpu_multiplier"]
         )
 
+        return True
+
+    def process_thermal_images(self):
+        """
+        Process thermal images by:
+        1. Verifying thermal images exist
+        2. Finding start/end timestamps from Timestamp files
+        3. Loading weather station data
+        4. Extracting mean weather values for the mission window
+        5. Running R script to convert thermal images to calibrated TIF
+        6. Updating image paths
+        """        
+        timer8a = time.time()
+
+        images_paths = self.cfg["images_path"]
+        if isinstance(images_paths, str):
+            images_paths = [images_paths]
+
+        all_photos = []
+        for images_path in images_paths:
+            ## Get paths to all the project photos
+            a = glob.iglob(os.path.join(images_path, "**", "*.*"), recursive=True)
+            b = [path for path in a]
+            photo_files = [
+                x for x in b 
+                if re.search(r"\_t.jpg$", x, re.IGNORECASE)
+            ]
+            all_photos.extend(photo_files)
+        if not all_photos:
+            raise Exception("No thermal images found to process. Remove --thermal flag or check images path.")
+
+        # Get thermal parameters
+        thermal_params = self.cfg["thermal_parameters"]
+        emissivity = thermal_params["emissivity"]
+        humidity = thermal_params["humidity"]
+        distance = thermal_params["distance"]
+        reflection = thermal_params["reflection"]
+        weather_station_path = thermal_params["weather_station_path"]
+        mission_start = thermal_params["mission_start"]
+        mission_end = thermal_params["mission_end"]
+        
+        # Ensure weather station path has /mnt/nfs prefix if needed
+        if weather_station_path:
+            if weather_station_path.startswith("/conrad") or weather_station_path.startswith("/lefodata"):
+                weather_station_path = "/mnt/nfs" + weather_station_path
+
+        # If humidity or reflection is None, extract from weather station
+        if (humidity is None or reflection is None) and weather_station_path:
+            print("Extracting weather data from weather station...")
+            
+            try:
+                if mission_start is None or mission_end is None:
+                    # Get mission start/end times from filenames across all images paths
+                    all_start_times = []
+                    all_end_times = []
+                    
+                    for images_path in images_paths:
+                        start_time, end_time = get_start_end_datetime_filename(images_path)
+                        all_start_times.append(start_time)
+                        all_end_times.append(end_time)
+                    
+                    # Get overall start and end from all paths
+                    mission_start = min(all_start_times)
+                    mission_end = max(all_end_times)
+                    
+                    print(f"  Mission time window: {mission_start} to {mission_end} (local time)")
+                else:
+                    # Use provided mission start/end times
+                    mission_start = datetime.datetime.strptime(mission_start, "%Y-%m-%d %H:%M:%S")
+                    mission_end = datetime.datetime.strptime(mission_end, "%Y-%m-%d %H:%M:%S")
+                    print(f"  Using provided mission time window: {mission_start} to {mission_end} (local time)")
+
+                # Load weather data
+                weather_data = load_weather_data(weather_station_path)
+                
+                # Extract mean weather values
+                weather_mean = extract_weather_mean(weather_data, mission_start, mission_end)
+                
+                # Use extracted values if not provided
+                if humidity is None:
+                    humidity = weather_mean.get('RH', 70.0)  # Default to 70 if column not found
+                    print(f"  Extracted humidity: {humidity:.1f}%")
+                
+                if reflection is None:
+                    reflection = weather_mean.get('AirT_C_Avg', 25.0)  # Default to 25 if column not found
+                    print(f"  Extracted reflection temperature: {reflection:.1f}°C")
+                    
+            except Exception as e:
+                print(f"  Warning: Could not extract weather data\n  {e}")
+                print(f"  Using default values: humidity=70%, reflection=25°C")
+                humidity = humidity if humidity is not None else 70.0
+                reflection = reflection if reflection is not None else 25.0
+        else:
+            # Use defaults if not provided and no weather station
+            humidity = humidity if humidity is not None else 70.0
+            reflection = reflection if reflection is not None else 25.0
+        
+        # Process each images path
+        for images_path in images_paths:
+            print(f"Processing thermal images in: {images_path}")
+            
+            # Define output directory for calibrated thermal images
+            out_dir = "/mnt/nfs/conrad/labolaliberte_upload/tmp/thermal/" + self.run_id + "/"
+            
+            # Path to R script
+            r_script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "R", "dji_m3t_rpeg_to_tif_v2_lefolab.r")
+            
+            # Build R command
+            cmd = [
+                "Rscript",
+                r_script_path,
+                str(emissivity),
+                str(humidity),
+                str(distance),
+                str(reflection),
+                images_path,
+                out_dir
+            ]
+            
+            print(f"Running: {' '.join(cmd)}")
+            
+            # Run R script
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                print("Output:")
+                print(result.stdout)
+                    
+            except subprocess.CalledProcessError as e:
+                print(f"Error: {e}")
+                print(f"stderr: {e.stderr}")
+                raise
+        
+        # Update image paths to point to new calibrated TIF files
+        self.cfg["images_path"] = out_dir
+        
+        timer8b = time.time()
+        time8 = diff_time(timer8b, timer8a)
+
+        # Record processing time to log file
+        with open(self.log_file, "a") as file:
+            file.write(MetashapeWorkflowLefolab.sep.join(["Thermal Image Processing", time8]) + "\n")
+        
         return True
 
     def add_photos(self, secondary=False):
