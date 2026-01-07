@@ -54,9 +54,9 @@ thermal_parameters:
     humidity: null # Range: 20-100 %    Default: extract from weather station data
     distance: 25 # Range: 1-25 m    Altitude - object height (set to 25 if camera-target-distance > 25 m)
     reflection: null # Range: -50-500    Represents the temperature of the day    Default: extract from weather station data
-    weather_station_path: "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat" # Path to weather station data to extract humidity and reflected temperature. If not provided, default values of 70% humidity and 25C reflection temperature are used.
-    mission_start: null # Format:"2024-06-01 00:00:00"    Start time of the flight mission in local time (to align with weather station data)
-    mission_end: null # Format:"2024-06-01 23:59:59"    End time of the flight mission in local time (to align with weather station data)
+    weather_station_path: "/conrad/labolaliberte_data/logs_sensors/projects/2025_wa_roberge/CR1000_OneMin.dat" # Path to weather station data to extract humidity and reflected temperature. If not provided, default values of 70% humidity and 25C reflection temperature are used.
+    mission_start: null # Format:"2024-06-01 00:00:00"    Start time of the flight mission in local time (to align with weather station data). If not provided, using the timestamp by filename of the first photo.
+    mission_end: null # Format:"2024-06-01 23:59:59"    End time of the flight mission in local time (to align with weather station data). IF not provided, using the timestamp by filename of the last photo.
 
 camera_calibration_path: "" # Path to camera calibration file. If not provided, Metashape will ignore this step.
 cameracalibration:

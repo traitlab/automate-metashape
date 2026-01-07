@@ -401,7 +401,7 @@ class MetashapeWorkflowLefolab:
             print(f"Processing thermal images in: {images_path}")
             
             # Define output directory for calibrated thermal images
-            out_dir = "/mnt/nfs/conrad/labolaliberte_upload/tmp/thermal/" + self.run_id + "/"
+            out_dir = "/mnt/nfs/lefodata/upload/tmp/thermal/" + self.run_id + "/"
             
             # Path to R script
             r_script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "R", "dji_m3t_rpeg_to_tif_v2_lefolab.r")
@@ -853,9 +853,14 @@ class MetashapeWorkflowLefolab:
 
         ## Export orthomosaic
         if self.cfg["buildOrthomosaic"]["export"]:
-            output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_rgb" + ".tif"
-            )
+            if self.cfg["thermal"]:
+                output_file = os.path.join(
+                    self.cfg["output_path"], self.run_id + "_tir" + ".tif"
+                )
+            else:
+                output_file = os.path.join(
+                    self.cfg["output_path"], self.run_id + "_rgb" + ".tif"
+                )
 
             compression = Metashape.ImageCompression()
             compression.tiff_big = self.cfg["buildOrthomosaic"]["tiff_big"]

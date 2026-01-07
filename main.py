@@ -129,16 +129,22 @@ if args.config_file == default_config_file:
 # Validate config using Pydantic model
 try:
     # Only apply CLI overrides when using default config
-    if args.config_file == default_config_file:
-        validated_config, config_dict = load_config(
-            config_file=args.config_file,
-            override_dict=args.__dict__
-        )
-    else:
-        # Don't apply CLI overrides when using custom config
-        validated_config, config_dict = load_config(
-            config_file=args.config_file,
-            override_dict=None
+    # if args.config_file == default_config_file:
+    #     validated_config, config_dict = load_config(
+    #         config_file=args.config_file,
+    #         override_dict=args.__dict__
+    #     )
+    # else:
+    #     # Don't apply CLI overrides when using custom config
+    #     validated_config, config_dict = load_config(
+    #         config_file=args.config_file,
+    #         override_dict=None
+    #     )
+    
+    # Always apply CLI overrides
+    validated_config, config_dict = load_config(
+        config_file=args.config_file,
+        override_dict=args.__dict__
         )
 except Exception as e:
     print(f"\nConfiguration validation failed: {e}\n")
