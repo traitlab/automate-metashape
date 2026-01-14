@@ -379,22 +379,25 @@ class MetashapeWorkflowLefolab:
                 
                 # Use extracted values if not provided
                 if humidity is None:
-                    humidity = weather_mean.get('RH', 70.0)  # Default to 70 if column not found
-                    print(f"  Extracted humidity: {humidity:.1f}%")
-                
+                    if 'RH' in weather_mean and weather_mean['RH'] is not None:
+                        humidity = weather_mean['RH']
+                        print(f"  Extracted humidity: {humidity:.1f}%")
+                    else:
+                        raise ValueError(
+                            "Humidity value is required but could not be determined from weather data and was not provided in the config."
+                        )
+
                 if reflection is None:
-                    reflection = weather_mean.get('AirT_C_Avg', 25.0)  # Default to 25 if column not found
-                    print(f"  Extracted reflection temperature: {reflection:.1f}°C")
-                    
+                    if 'AirT_C_Avg' in weather_mean and weather_mean['AirT_C_Avg'] is not None:
+                        reflection = weather_mean['AirT_C_Avg']
+                        print(f"  Extracted reflection temperature: {reflection:.1f}°C")
+                    else:
+                        raise ValueError(
+                            "Reflection temperature is required but could not be determined from weather data and was not provided in the config."
+                        )
+
             except Exception as e:
-                print(f"  Warning: Could not extract weather data\n  {e}")
-                print(f"  Using default values: humidity=70%, reflection=25°C")
-                humidity = humidity if humidity is not None else 70.0
-                reflection = reflection if reflection is not None else 25.0
-        else:
-            # Use defaults if not provided and no weather station
-            humidity = humidity if humidity is not None else 70.0
-            reflection = reflection if reflection is not None else 25.0
+                raise ValueError(f"Could not extract weather data\n  {e}")
         
         # Process each images path
         for images_path in images_paths:
