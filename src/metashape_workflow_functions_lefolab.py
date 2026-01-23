@@ -443,6 +443,8 @@ class MetashapeWorkflowLefolab:
         # Record processing time to log file
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Thermal Image Processing", time8]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["  Humidity (%)", f"{humidity:.1f}"]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["  Reflection (°C)", f"{reflection:.1f}"]) + "\n")
         
         return True
 
