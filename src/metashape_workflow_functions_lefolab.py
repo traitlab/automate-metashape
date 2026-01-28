@@ -101,12 +101,12 @@ class MetashapeWorkflowLefolab:
 
         self.enable_and_log_gpu()
 
-        # Process thermal images if enabled
-        if self.cfg["thermal"]:
-            self.process_thermal_images()
-
-        # Skip add_photos and align_photos if resuming after GCPs
+        # Skip thermal process, add_photos and align_photos if resuming after GCPs
         if not self.after_gcps:
+            # Process thermal images if enabled
+            if self.cfg["thermal"]:
+                self.process_thermal_images()
+
             # Add photos
             if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
                 self.add_photos()
