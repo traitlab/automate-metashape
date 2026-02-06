@@ -209,7 +209,8 @@ class MetashapeWorkflowLefolab:
             chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
 
         # Save doc as new project (even if an existing project was opened, save as a separate one)
-        # self.doc.save(project_file)
+        if not self.cfg["gcps"]:
+            self.doc.save(self.project_file)
 
         """
         Log specs except for GPU
@@ -404,7 +405,8 @@ class MetashapeWorkflowLefolab:
             print(f"Processing thermal images in: {images_path}")
             
             # Define output directory for calibrated thermal images
-            out_dir = "/mnt/nfs/lefodata/upload/tmp/thermal/" + self.run_id + "/"
+            # out_dir = "/mnt/nfs/lefodata/upload/tmp/thermal/" + self.run_id + "/" 
+            out_dir = "/mnt/nfs/conrad/labolaliberte_upload/tmp/thermal/" + self.run_id + "/" #lefodata access broken
             
             # Path to R script
             r_script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "R", "dji_m3t_rpeg_to_tif_v2_lefolab.r")
@@ -517,7 +519,8 @@ class MetashapeWorkflowLefolab:
             
             sensor.fixed_params=self.cfg["cameracalibration"]["fixed_parameters"]
 
-        #self.doc.save()
+        if not self.cfg["gcps"]:
+            self.doc.save()
 
         return True
 
@@ -545,7 +548,9 @@ class MetashapeWorkflowLefolab:
             subdivide_task=self.cfg["subdivide_task"],
             reset_alignment=self.cfg["alignPhotos"]["reset_alignment"],
         )
-        #self.doc.save()
+        
+        if not self.cfg["gcps"]:
+            self.doc.save()
 
         timer1b = time.time()
         time1 = diff_time(timer1b, timer1a)
@@ -615,7 +620,7 @@ class MetashapeWorkflowLefolab:
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time2]) + "\n")
 
-        self.doc.save(self.project_file)
+        self.doc.save()
 
     def build_point_cloud(self):
         """
@@ -911,7 +916,7 @@ class MetashapeWorkflowLefolab:
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time5]) + "\n")
 
-        #self.doc.save()
+        self.doc.save()
 
     def build_point_cloud_highdis(self):
         """
