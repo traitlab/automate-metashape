@@ -43,6 +43,7 @@ addPhotos: # (Metashape: addPhotos)
   use_xmp_accuracy: False # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
   photos_accuracy: 1 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
   load_reference: True
+  import_reference: False # Whether to import new reference for photo (DJI PPK csv) from a file. Default is False.
   load_xmp_calibration: True
   load_xmp_orientation: True
   load_xmp_accuracy: True

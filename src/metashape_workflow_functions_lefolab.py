@@ -497,6 +497,19 @@ class MetashapeWorkflowLefolab:
             path = camera.photo.path
             camera.label = path
 
+        # If specified, import reference for photos from a file (e.g. DJI PPK csv)
+        if self.cfg["addPhotos"]["import_reference"]:
+            reference_path = f'{images_paths[0]}/{self.cfg["mission_id"]}_POS.txt'
+            if os.path.exists(reference_path):
+                self.doc.chunk.importReference(reference_path, Metashape.ReferenceFormatCSV, delimiter=',',
+                                               skip_rows=1, crs = Metashape.CoordinateSystem(self.cfg["input_crs"]),
+                                               load_rotation=True, load_location_accuracy=True,
+                                               column_label=1, column_x=3, column_y=2, column_z=4,
+                                               column_sx=8, column_sy=8, column_sz=9, 
+                                               column_a=5, column_b=6, column_c=7)
+            else:
+                raise FileNotFoundError(f"Reference import specified but reference file not found at expected path: {reference_path}")
+
         # If specified, change the accuracy of the cameras for custom value
         if self.cfg["addPhotos"]["use_xmp_accuracy"] == False:
             for cam in self.doc.chunk.cameras:
