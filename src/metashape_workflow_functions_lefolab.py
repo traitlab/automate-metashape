@@ -468,10 +468,16 @@ class MetashapeWorkflowLefolab:
             ## Get paths to all the project photos
             a = glob.iglob(os.path.join(images_path, "**", "*.*"), recursive=True)
             b = [path for path in a]
-            photo_files = [
-                x for x in b 
-                if re.search(r"\.(tif|jpg)$", x, re.IGNORECASE)
-            ]
+            if self.cfg["thermal"]:
+                photo_files = [
+                    x for x in b 
+                    if re.search(r"\.tif$", x, re.IGNORECASE)
+                ]
+            else:
+                photo_files = [
+                    x for x in b 
+                    if re.search(r"\.jpg$", x, re.IGNORECASE)
+                ]
 
             if self.cfg["addPhotos"]["multispectral"]:
                 self.doc.chunk.addPhotos(
