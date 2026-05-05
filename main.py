@@ -106,8 +106,8 @@ def parse_args():
         if not re.match(mission_id_pattern, mission_id):
             raise ValueError(
                 f"Could not extract valid mission_id from images path: '{mission_id}'."
-                "mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
-                "Please specify a valid mission_id using --mission-id."
+                " mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
+                " Please specify a valid mission_id using --mission-id."
             )
         else:
             args.mission_id = mission_id

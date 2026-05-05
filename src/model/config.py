@@ -242,6 +242,7 @@ class MetashapeConfig(BaseModel):
     input_crs: str = "EPSG::4326"
     project_crs: str = ""
     load_project: str = ""
+    new_chunk: bool = False
     subdivide_task: bool = True
     use_cuda: bool = True
     gpu_multiplier: int = Field(default=2, ge=1)
@@ -357,7 +358,7 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
         else:
             raise ValueError(
                 f"Could not extract valid mission_id from images path: '{mission_id}'."
-                "mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
+                " mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
             )
     
     # Raise error if mission_id is still not set

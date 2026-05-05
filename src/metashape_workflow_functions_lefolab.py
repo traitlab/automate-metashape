@@ -176,29 +176,36 @@ class MetashapeWorkflowLefolab:
 
         # If specified, open existing project
         if self.cfg["load_project"] != "":
-            self.doc.open(self.cfg["load_project"])
+            self.doc.open(self.cfg["load_project"], ignore_lock=True)
 
-            # Raise error if the project does not have a chunk, or has multiple chunks
-            if len(self.doc.chunks) == 0:
-                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks.")
-            if len(self.doc.chunks) > 1:
-                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk.")
+            # Check if new_chunk is enabled
+            if self.cfg["new_chunk"]:
+                # Create a new chunk in the existing project
+                chunk = self.doc.addChunk()
+                chunk.label = mission_id
+                chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
+            else:
+                # Raise error if the project does not have a chunk, or has multiple chunks
+                if len(self.doc.chunks) == 0:
+                    raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks.")
+                if len(self.doc.chunks) > 1:
+                    raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk.")
 
-            # If cameras are already present, make sure they exist and their paths are identical to their labels
-            if self.doc.chunk.cameras:
-                for camera in self.doc.chunk.cameras:
-                    photo_path = camera.photo.path
-                    if not os.path.exists(photo_path):
-                        # If the path does not exist, try to set it to the label
-                        if os.path.exists(camera.label):
-                            camera.photo.path = camera.label
-                        else:
-                            raise FileNotFoundError(f"Photo path for camera '{camera.label}' does not exist: {photo_path}")
-                        
-            # If markers exist, set after_gcps to True
-            if self.doc.chunk.markers:
-                self.after_gcps = True
-                self.cfg["gcps"] = False
+                # If cameras are already present, make sure they exist and their paths are identical to their labels
+                if self.doc.chunk.cameras:
+                    for camera in self.doc.chunk.cameras:
+                        photo_path = camera.photo.path
+                        if not os.path.exists(photo_path):
+                            # If the path does not exist, try to set it to the label
+                            if os.path.exists(camera.label):
+                                camera.photo.path = camera.label
+                            else:
+                                raise FileNotFoundError(f"Photo path for camera '{camera.label}' does not exist: {photo_path}")
+                            
+                # If markers exist, set after_gcps to True
+                if self.doc.chunk.markers:
+                    self.after_gcps = True
+                    self.cfg["gcps"] = False
         else:
             # Use absolute paths for photos to solve path issues when opening with GUI
             Metashape.app.settings.project_absolute_paths = True
@@ -208,9 +215,13 @@ class MetashapeWorkflowLefolab:
             chunk.label = mission_id
             chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
 
-        # Save doc as new project (even if an existing project was opened, save as a separate one)
+        # Save doc as new project (or save to same project if new_chunk is enabled)
         if not self.cfg["gcps"]:
-            self.doc.save(self.project_file)
+            # If new_chunk is enabled and we loaded a project, save to the loaded project path
+            if self.cfg["new_chunk"] and self.cfg["load_project"] != "":
+                self.doc.save()
+            else:
+                self.doc.save(self.project_file)
 
         """
         Log specs except for GPU
@@ -609,7 +620,11 @@ class MetashapeWorkflowLefolab:
                 new_path = old_path.replace("/mnt/nfs/conrad/", "//conrad-irbv.irbv.umontreal.ca/")
                 camera.photo.path = new_path
 
-        self.doc.save(self.project_file)
+        # Save to the appropriate project file
+        if self.cfg["new_chunk"] and self.cfg["load_project"] != "":
+            self.doc.save()
+        else:
+            self.doc.save(self.project_file)
 
         print("[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, and rerun with --load-project and --gcps to resume processing.")
         gui_path = self.doc.path.replace('/mnt/nfs/conrad/', '//conrad-irbv.irbv.umontreal.ca/').replace('/', '\\')
