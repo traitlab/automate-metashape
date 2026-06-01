@@ -180,10 +180,11 @@ class MetashapeWorkflowLefolab:
 
             # Check if new_chunk is enabled
             if self.cfg["new_chunk"]:
-                # Create a new chunk in the existing project
+                # Create a new chunk in the existing project and make it active
                 chunk = self.doc.addChunk()
                 chunk.label = mission_id
                 chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
+                self.doc.chunk = chunk
             else:
                 # Raise error if the project does not have a chunk, or has multiple chunks
                 if len(self.doc.chunks) == 0:
@@ -707,7 +708,7 @@ class MetashapeWorkflowLefolab:
                     source_data=Metashape.PointCloudData,
                     format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
-                    clases=self.cfg["buildPointCloud"]["classes"],
+                    classes=self.cfg["buildPointCloud"]["classes"],
                     subdivide_task=self.cfg["subdivide_task"],
                 )
 
@@ -1008,7 +1009,7 @@ class MetashapeWorkflowLefolab:
                     source_data=Metashape.PointCloudData,
                     format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
-                    clases=self.cfg["buildPointCloudHighDis"]["classes"],
+                    classes=self.cfg["buildPointCloudHighDis"]["classes"],
                     subdivide_task=self.cfg["subdivide_task"],
                 )
 
@@ -1234,20 +1235,24 @@ class MetashapeWorkflowLefolab:
 
         # Cleanup project files if required
         if self.cfg["delete_project"]:
-            project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
-            project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
-            
+            if self.cfg["new_chunk"] and self.cfg["load_project"] != "":
+                project_file = self.cfg["load_project"]
+                project_files_dir = os.path.splitext(project_file)[0] + ".files"
+            else:
+                project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
+                project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
+
             if os.path.exists(project_file):
                 os.remove(project_file)
-            
+
             # Delete the .files directory if it exists
             if os.path.exists(project_files_dir):
                 shutil.rmtree(project_files_dir)
-            
+
             # Delete the log file
             if os.path.exists(self.log_file):
                 os.remove(self.log_file)
-            
+
             print("[INFO] Project files deleted (output files preserved).")
 
         return True

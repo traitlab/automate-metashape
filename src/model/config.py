@@ -373,7 +373,10 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
     mission_year = mission_id[:4]
     
     if not config_dict.get('project_path'):
-        config_dict['project_path'] = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{mission_id}"
+        if config_dict.get('load_project'):
+            config_dict['project_path'] = os.path.dirname(config_dict['load_project'])
+        else:
+            config_dict['project_path'] = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{mission_id}"
     
     if not config_dict.get('output_path'):
         config_dict['output_path'] = f"{config_dict['project_path']}/metashape/"
