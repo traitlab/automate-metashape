@@ -859,7 +859,12 @@ class MetashapeWorkflowLefolab:
         if self.cfg["buildPointCloud"]["remove_after_export"]:
             self.doc.chunk.remove(self.doc.chunk.point_clouds)
 
-        self.doc.save()
+        if (
+            self.cfg["buildDem"]["enabled"]
+            or self.cfg["buildOrthomosaic"]["enabled"]
+            or self.cfg["buildPointCloud"]["remove_after_export"]
+        ):
+            self.doc.save()
 
         return True
 
@@ -948,7 +953,7 @@ class MetashapeWorkflowLefolab:
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time5]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps - HighDis", time5]) + "\n")
 
         self.doc.save()
 
@@ -971,7 +976,7 @@ class MetashapeWorkflowLefolab:
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud", time6]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud - HighDis", time6]) + "\n")
 
         self.doc.save()
 

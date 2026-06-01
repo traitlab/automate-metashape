@@ -69,6 +69,7 @@ def parse_args():
         "-g",
         "--gcps",
         action="store_true",
+        default=None,
         help="Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --gcps to continue.",
     )
     parser.add_argument(
@@ -80,6 +81,7 @@ def parse_args():
         "-q",
         "--quick-process",
         action="store_true",
+        default=None,
         help="Faster processing by disabling High quality and Disable filtering options (HighDis).\n"
         + "By default, High quality and Disable filtering options are enabled.",
     )
@@ -87,12 +89,14 @@ def parse_args():
         "-t",
         "--thermal",
         action="store_true",
+        default=None,
         help="Process thermal images using default parameters.\n"
         + "By default, thermal images are disabled.",
     )
     parser.add_argument(
         "--delete-project",
         action="store_true",
+        default=None,
         help="Delete project file after processing. Kept by default.",
     )
 

@@ -382,13 +382,6 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
     if not config_dict.get('project_crs') and config_dict.get('images_path'):
         images_path = config_dict['images_path']
         
-        # Handle list of paths - concatenate all paths
-        if isinstance(images_path, list):
-            all_images = []
-            for path in images_path:
-                all_images.append(path)
-            images_path = all_images
-        
         try:
             median_latitude, median_longitude = calculate_median_coordinates(images_path)
             config_dict['project_crs'] = calculate_utm_epsg(median_latitude, median_longitude)
