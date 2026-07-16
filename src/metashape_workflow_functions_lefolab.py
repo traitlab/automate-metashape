@@ -5,6 +5,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -96,48 +97,134 @@ class MetashapeWorkflowLefolab:
         Execute metashape workflow steps based on config file
         """
         self.processing_start_time = time.time()
-        
-        self.project_setup()
 
-        self.enable_and_log_gpu()
+        # Make a plain `kill` (SIGTERM) raise SystemExit so the finally block
+        # below releases the mission lock instead of leaving it behind
+        try:
+            signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(128 + signum))
+        except ValueError:
+            pass  # signal handlers can only be set from the main thread
 
-        # Skip thermal process, add_photos and align_photos if resuming after GCPs
-        if not self.after_gcps:
-            # Process thermal images if enabled
-            if self.cfg["thermal"]:
-                self.process_thermal_images()
+        try:
+            self.project_setup()
 
-            # Add photos
-            if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
-                self.add_photos()
+            self.enable_and_log_gpu()
 
-            # Align photos
-            if self.cfg["alignPhotos"]["enabled"]:
-                self.align_photos()
-                self.reset_region()
+            # Skip thermal process, add_photos and align_photos if resuming after GCPs
+            if not self.after_gcps:
+                # Process thermal images if enabled
+                if self.cfg["thermal"]:
+                    self.process_thermal_images()
 
-        # Add GCPs manually via GUI if specified
-        if self.cfg["gcps"]:
-            self.add_gcps()
-            return
+                # Add photos
+                if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
+                    self.add_photos()
 
-        if self.cfg["buildDepthMaps"]["enabled"]:
-            self.build_depth_maps()
+                # Align photos
+                if self.cfg["alignPhotos"]["enabled"]:
+                    self.align_photos()
+                    self.reset_region()
 
-        if self.cfg["buildPointCloud"]["enabled"]:
-            self.build_point_cloud()
+            # Add GCPs manually via GUI if specified
+            if self.cfg["gcps"]:
+                self.add_gcps()
+                return
 
-        # For this step, the check for whether it is enabled in the config happens inside the function, because there are two steps (DEM and ortho), each of which can be enabled independently
-        self.build_dem_orthomosaic()
+            if self.cfg["buildDepthMaps"]["enabled"]:
+                self.build_depth_maps()
 
-        if not self.cfg["quick_process"]:
-            self.build_depth_maps_highdis()
-            self.build_point_cloud_highdis()
-            self.build_dem_highdis()
+            if self.cfg["buildPointCloud"]["enabled"]:
+                self.build_point_cloud()
 
-        self.export_report()
+            # For this step, the check for whether it is enabled in the config happens inside the function, because there are two steps (DEM and ortho), each of which can be enabled independently
+            self.build_dem_orthomosaic()
 
-        self.finish_run()
+            if not self.cfg["quick_process"]:
+                self.build_depth_maps_highdis()
+                self.build_point_cloud_highdis()
+                self.build_dem_highdis()
+
+            self.export_report()
+
+            self.finish_run()
+        finally:
+            self._release_mission_lock()
+
+    def _acquire_mission_lock(self):
+        """
+        Atomically claim <project_path>/<mission_id>.lock so the same mission cannot
+        be processed twice concurrently. A lock left behind by a killed process is
+        removed automatically if it was created on this node and its PID is dead;
+        a lock from another node must be verified and removed manually.
+        """
+        self.mission_lock_file = os.path.join(self.cfg["project_path"], self.cfg["mission_id"] + ".lock")
+        self._mission_lock_acquired = False
+
+        for _ in range(2):
+            try:
+                fd = os.open(self.mission_lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                with os.fdopen(fd, "w") as file:
+                    file.write(f"node: {platform.node()}\npid: {os.getpid()}\nstarted: {stamp_time()}\n")
+                self._mission_lock_acquired = True
+                return
+            except FileExistsError:
+                node, pid = self._read_mission_lock()
+                if node == platform.node() and pid is not None and not self._pid_is_alive(pid):
+                    print(f"[INFO] Removing stale mission lock left by dead PID {pid} on this node.")
+                    try:
+                        os.remove(self.mission_lock_file)
+                    except FileNotFoundError:
+                        pass
+                    continue
+                raise RuntimeError(
+                    f"Mission {self.cfg['mission_id']} is already being processed"
+                    f" (node: {node}, PID: {pid}, lock file: {self.mission_lock_file})."
+                    " If that process was killed, verify with 'ps -p <pid>' on that node,"
+                    " then delete the lock file and relaunch."
+                )
+        raise RuntimeError(f"Could not acquire mission lock: {self.mission_lock_file}")
+
+    def _read_mission_lock(self):
+        """
+        Read node and PID from an existing mission lock file
+        """
+        node, pid = "unknown", None
+        try:
+            with open(self.mission_lock_file) as file:
+                for line in file:
+                    key, _, value = line.partition(":")
+                    if key.strip() == "node":
+                        node = value.strip()
+                    elif key.strip() == "pid" and value.strip().isdigit():
+                        pid = int(value.strip())
+        except OSError:
+            pass
+        return node, pid
+
+    @staticmethod
+    def _pid_is_alive(pid):
+        # Signal 0 performs no action but fails if the PID does not exist.
+        # Only meaningful on POSIX; elsewhere assume alive to stay safe.
+        if os.name != "posix":
+            return True
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    def _release_mission_lock(self):
+        """
+        Remove the mission lock file, only if this run acquired it
+        """
+        if getattr(self, "_mission_lock_acquired", False):
+            try:
+                os.remove(self.mission_lock_file)
+            except FileNotFoundError:
+                pass
+            self._mission_lock_acquired = False
 
     def project_setup(self):
         """
@@ -152,6 +239,9 @@ class MetashapeWorkflowLefolab:
         # Ensure project path exists
         os.makedirs(self.cfg["project_path"], exist_ok=True)
 
+        # Prevent two concurrent runs of the same mission
+        self._acquire_mission_lock()
+
         mission_id = self.cfg["mission_id"]
 
         # Project file name format: "missionID_YYYY-MM-DDtHHMM.psx"
@@ -162,11 +252,19 @@ class MetashapeWorkflowLefolab:
         self.project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
         self.log_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"]))
 
-        if os.path.exists(self.project_file) and not self.cfg["load_project"]:
-            raise FileExistsError(
-                f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}."
-                "Please retry in a minute or use --load-project to open the existing project."
-            )
+        if not self.cfg["load_project"]:
+            # Claim the project file atomically (O_EXCL) so two runs started in the
+            # same minute cannot both pass an exists() check before either has saved.
+            # The empty placeholder is overwritten by doc.save() below.
+            try:
+                fd = os.open(self.project_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+            except FileExistsError:
+                raise FileExistsError(
+                    f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}. "
+                    "Another run may have claimed it first. "
+                    "Please retry in a minute or use --load-project to open the existing project."
+                )
 
         """
         Create a doc and a chunk
