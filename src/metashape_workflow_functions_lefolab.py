@@ -203,10 +203,31 @@ class MetashapeWorkflowLefolab:
 
     @staticmethod
     def _pid_is_alive(pid):
-        # Signal 0 performs no action but fails if the PID does not exist.
+        # Determine whether a PID belongs to a process that is still actively
+        # holding the lock. A process that no longer exists is dead; so is one
+        # that is a zombie (Z, already exited, waiting to be reaped) or stopped
+        # (T/t, suspended and making no progress) -- in both cases the run is
+        # not proceeding, so the lock should be reclaimable on this node.
         # Only meaningful on POSIX; elsewhere assume alive to stay safe.
         if os.name != "posix":
             return True
+
+        # On Linux, inspect the process state directly so zombie and stopped
+        # processes do not falsely keep the lock held.
+        try:
+            with open(f"/proc/{pid}/stat") as file:
+                # The state is the field after the (comm) parenthesised name,
+                # which may itself contain spaces/parentheses.
+                state = file.read().rpartition(")")[2].split()[0]
+            # Z = zombie (defunct), T = stopped, t = tracing stop.
+            return state not in ("Z", "T", "t")
+        except FileNotFoundError:
+            return False
+        except (OSError, IndexError):
+            pass
+
+        # Fall back to signal 0: performs no action but fails if the PID does
+        # not exist. Used on non-Linux POSIX systems without /proc.
         try:
             os.kill(pid, 0)
             return True
