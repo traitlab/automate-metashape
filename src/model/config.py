@@ -384,10 +384,12 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
     # Calculate project_crs from photos if not provided
     if not config_dict.get('project_crs') and config_dict.get('images_path'):
         images_path = config_dict['images_path']
+        print("[INFO] Calculating project CRS from photos...")
         
         try:
             median_latitude, median_longitude = calculate_median_coordinates(images_path)
             config_dict['project_crs'] = calculate_utm_epsg(median_latitude, median_longitude)
+            print(f"[INFO] Using {config_dict['project_crs']} as project CRS based on median photo coordinates.")
         except Exception as e:
             raise ValueError(
                 f"Failed to calculate project_crs from photos: {e}\n"
