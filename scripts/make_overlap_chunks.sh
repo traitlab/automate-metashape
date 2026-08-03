@@ -157,11 +157,14 @@ build_main() {   # run_name
   echo "  ${name}_main: from [$missions] minus own seam lines"
 }
 
+# Bash returns associative-array keys in hash order, so sort them for stable logs.
+mapfile -t RUN_NAMES < <(printf '%s\n' "${!RUN_MISSIONS[@]}" | sort -V)
+
 echo "[2/3] building per-run main folders ..."
-for name in "${!RUN_MISSIONS[@]}"; do build_main "$name"; done
+for name in "${RUN_NAMES[@]}"; do build_main "$name"; done
 
 echo "[3/3] images_path for each config:"
-for name in "${!RUN_MISSIONS[@]}"; do
+for name in "${RUN_NAMES[@]}"; do
   line="[\"$ROOT/${name}_main\""
   for ov in ${RUN_OVERLAPS[$name]:-}; do line+=", \"$ROOT/$ov\""; done
   line+="]"
