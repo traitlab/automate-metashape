@@ -61,6 +61,19 @@ def get_chunk(doc, name=None, index=0):
     return doc.chunks[index]
 
 
+def resolve_chunks(doc, names=None):
+    """Return the chunks named by ``names``, or every chunk if ``names`` is empty.
+
+    The multi-chunk steps (process.align_chunks, process.merge_chunks) act on a
+    set of chunks rather than the one --chunk the other steps take. Selection by
+    label goes through get_chunk, so an unknown label fails the same way and the
+    first match wins on duplicate labels.
+    """
+    if not names:
+        return list(doc.chunks)
+    return [get_chunk(doc, name=name) for name in names]
+
+
 def derive_project_crs(chunk):
     """Guess a projected (UTM) CRS from the chunk's camera reference coordinates.
 

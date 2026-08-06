@@ -3,11 +3,10 @@
 Run individual Metashape steps against a project that already exists.
 
 main.py runs a whole mission: one document lifecycle, the active chunk only, a
-mission lock, and a reproducibility log. It refuses projects with more than one
-chunk. This runs one step at a time on a chunk you name, which is what you need
+mission lock, and a reproducibility log. Every step it runs is a single-chunk
+step. This runs one step at a time on a chunk you name, which is what you need
 for surgery -- re-export a product in a different CRS, rebuild a DEM at a
-different resolution, or process the chunk left behind by a GUI
-"Merge by camera labels" after scripts/make_overlap_chunks.sh.
+different resolution, or align and merge the chunks of a multi-chunk project.
 
 Use main.py for real missions. Nothing here writes a processing log, so a
 product built with this script has no provenance record of its own.
@@ -27,6 +26,19 @@ Repeat --task to chain steps in one document open/save cycle:
         --project path/to/project.psx \
         --task build_dem --task build_orthomosaic \
         --task export_ortho --output out/ortho.tif
+
+align_chunks and merge_chunks act on a set of chunks rather than one. Name them
+with --chunks (repeat it) or leave it out to take every chunk in the project;
+the rest of the chain then continues on the merged chunk. Chunks that overlap
+leave their shared photos in the merge twice, once per source chunk, so
+deduplicate_cameras disables all but the first camera holding each photo:
+
+    python scripts/run_task.py \
+        --project path/to/project.psx \
+        --chunks run_a --chunks run_b \
+        --task align_chunks --task merge_chunks --merged-label run_ab \
+        --task deduplicate_cameras \
+        --task build_depth_maps --task build_point_cloud
 
 The project is saved after each step that changes it, as the pipeline does, so a
 failure late in a chain doesn't discard the work before it. Pass --no-save for a
@@ -51,81 +63,110 @@ from src.ms_lib.io import (  # noqa: E402
     get_chunk,
     new_document,
     open_document,
+    resolve_chunks,
     save,
 )
 
+# Every task takes (doc, chunk, args). Most only need the chunk; the multi-chunk
+# steps need the document. A task that replaces the chunk the rest of the chain
+# should run on returns it (merge_chunks does); anything else returns None.
 
-def task_add_photos(chunk, args):
+
+def task_add_photos(doc, chunk, args):
     require(args, "images")
     process.add_photos(chunk, args.images, multispectral=args.multispectral or None,
                        config_file=args.config_file)
 
 
-def task_align(chunk, args):
+def task_align(doc, chunk, args):
     process.align_photos(chunk, config_file=args.config_file)
 
 
-def task_reset_region(chunk, args):
+def task_align_chunks(doc, chunk, args):
+    chunks = resolve_chunks(doc, args.chunks)
+    reference = get_chunk(doc, name=args.reference_chunk) if args.reference_chunk else None
+    print("[run_task] aligning chunks: " + ", ".join(repr(c.label) for c in chunks))
+    process.align_chunks(doc, chunks, reference=reference, config_file=args.config_file)
+
+
+def task_merge_chunks(doc, chunk, args):
+    chunks = resolve_chunks(doc, args.chunks)
+    print("[run_task] merging chunks: " + ", ".join(repr(c.label) for c in chunks))
+    merged = process.merge_chunks(doc, chunks, label=args.merged_label,
+                                  config_file=args.config_file)
+    print(f"[run_task] merged into new chunk '{merged.label}' "
+          f"({len(merged.cameras)} cameras)")
+    # Later steps in the chain build on the merge result, not on --chunk.
+    return merged
+
+
+def task_deduplicate_cameras(doc, chunk, args):
+    count = process.deduplicate_cameras(chunk, remove=args.remove_duplicates)
+    verb = "removed" if args.remove_duplicates else "disabled"
+    print(f"[run_task] {verb} {count} duplicate cameras in '{chunk.label}'")
+
+
+def task_reset_region(doc, chunk, args):
     process.reset_region(chunk)
 
 
-def task_build_depth_maps(chunk, args):
+def task_build_depth_maps(doc, chunk, args):
     process.build_depth_maps(chunk, config_file=args.config_file)
 
 
-def task_build_depth_maps_highdis(chunk, args):
+def task_build_depth_maps_highdis(doc, chunk, args):
     process.build_depth_maps(chunk, section="buildDepthMapsHighDis",
                              config_file=args.config_file)
 
 
-def task_build_point_cloud(chunk, args):
+def task_build_point_cloud(doc, chunk, args):
     process.build_point_cloud(chunk, config_file=args.config_file)
 
 
-def task_build_point_cloud_highdis(chunk, args):
+def task_build_point_cloud_highdis(doc, chunk, args):
     process.build_point_cloud(chunk, section="buildPointCloudHighDis",
                               config_file=args.config_file)
 
 
-def task_build_model(chunk, args):
+def task_build_model(doc, chunk, args):
     process.build_model(chunk)
 
 
-def task_build_dem(chunk, args):
+def task_build_dem(doc, chunk, args):
     process.build_dem(chunk, args.crs, resolution=args.resolution,
                       config_file=args.config_file)
 
 
-def task_build_dem_highdis(chunk, args):
+def task_build_dem_highdis(doc, chunk, args):
     process.build_dem(chunk, args.crs, resolution=args.resolution,
                       section="buildDemHighDis", config_file=args.config_file)
 
 
-def task_build_orthomosaic(chunk, args):
+def task_build_orthomosaic(doc, chunk, args):
     process.build_orthomosaic(chunk, args.crs, config_file=args.config_file)
 
 
-def task_export_ortho(chunk, args):
+def task_export_ortho(doc, chunk, args):
     require(args, "output")
     export.export_orthomosaic(chunk, args.output, args.crs, config_file=args.config_file)
 
 
-def task_export_dem(chunk, args):
+def task_export_dem(doc, chunk, args):
     require(args, "output")
     export.export_dem(chunk, args.output, args.crs, config_file=args.config_file)
 
 
-def task_export_point_cloud(chunk, args):
+def task_export_point_cloud(doc, chunk, args):
     require(args, "output")
     export.export_point_cloud(chunk, args.output, args.crs, config_file=args.config_file)
 
 
-def task_export_model(chunk, args):
+def task_export_model(doc, chunk, args):
     require(args, "output")
     export.export_model(chunk, args.output)
 
 
-def task_export_report(chunk, args):
+def task_export_report(doc, chunk, args):
     require(args, "output")
     export.export_report(chunk, args.output)
 
@@ -133,6 +174,9 @@ def task_export_report(chunk, args):
 TASKS = {
     "add_photos": task_add_photos,
     "align": task_align,
+    "align_chunks": task_align_chunks,
+    "merge_chunks": task_merge_chunks,
+    "deduplicate_cameras": task_deduplicate_cameras,
     "reset_region": task_reset_region,
     "build_depth_maps": task_build_depth_maps,
     "build_depth_maps_highdis": task_build_depth_maps_highdis,
@@ -148,6 +192,9 @@ TASKS = {
     "export_model": task_export_model,
     "export_report": task_export_report,
 }
+
+# Tasks that act on a set of chunks rather than the single --chunk one.
+DOCUMENT_TASKS = {"align_chunks", "merge_chunks"}
 
 # Tasks that project into an output CRS. For these, --crs is resolved up front
 # (from the chunk's camera coordinates if not given) rather than silently
@@ -190,6 +237,28 @@ def parse_args(argv):
         "mission lock, and writes the processing log.",
     )
     parser.add_argument("--chunk", help="Chunk label (defaults to the first chunk)")
+    parser.add_argument(
+        "--chunks",
+        action="append",
+        help="Chunk label for the multi-chunk tasks (align_chunks, merge_chunks);\n"
+        "repeat for each chunk. Defaults to every chunk in the project.",
+    )
+    parser.add_argument(
+        "--reference-chunk",
+        help="Chunk the others are aligned onto by align_chunks. Must be one of\n"
+        "--chunks; defaults to the first of them.",
+    )
+    parser.add_argument(
+        "--merged-label",
+        help="Label to give the chunk merge_chunks creates (default: Metashape's own,\n"
+        "'Merged Chunk').",
+    )
+    parser.add_argument(
+        "--remove-duplicates",
+        action="store_true",
+        help="Make deduplicate_cameras delete the duplicate cameras instead of\n"
+        "disabling them. Deleting also drops the tie points they were aligned from.",
+    )
     parser.add_argument(
         "--input-crs", default="EPSG::4326", help="Input CRS for a newly created chunk"
     )
@@ -268,8 +337,16 @@ def main(argv):
     )
 
     for task_name in args.task:
-        print(f"[run_task] {task_name} on chunk '{chunk.label}'")
-        TASKS[task_name](chunk, args)
+        if task_name in DOCUMENT_TASKS:
+            print(f"[run_task] {task_name} on {len(doc.chunks)} chunks")
+        else:
+            print(f"[run_task] {task_name} on chunk '{chunk.label}'")
+
+        # merge_chunks hands back the chunk it created; the rest of the chain
+        # continues on that instead of the one --chunk selected.
+        replacement = TASKS[task_name](doc, chunk, args)
+        if replacement is not None:
+            chunk = replacement
 
         # Save per step, like the pipeline does, so a failure late in a chain
         # doesn't throw away the hours of work before it.

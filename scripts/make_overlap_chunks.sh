@@ -3,8 +3,9 @@
 # make_overlap_chunks.sh
 # -----------------------
 # Build symlink folders so adjacent runs (chunks) share their boundary flight
-# lines, enabling a "Merge by camera labels" in Metashape (avoids the
-# out-of-memory that a tie-point merge causes on large projects).
+# lines, giving Metashape cameras in common to align the chunks on before
+# merging them (avoids the out-of-memory that a tie-point merge causes on large
+# projects).
 #
 # Because src/metashape_workflow_functions_lefolab.py sets each camera's label
 # to its photo *path*, both runs on either side of a seam must reference the
@@ -174,4 +175,12 @@ done
 echo
 echo "Each config's images_path is printed above. Both runs on a seam list the"
 echo "same overlap_* folder, so the seam photos get identical labels in both"
-echo "chunks. Then in Metashape: Workflow -> Merge Chunks -> Merge by camera labels."
+echo "chunks -- which is what camera-based Align Chunks matches the chunks on."
+echo
+echo "Run each config with load_project + new_chunk: True so every run lands as"
+echo "a chunk of the same project, then:"
+echo "  python scripts/run_task.py --project <project>.psx \\"
+echo "      --task align_chunks --task merge_chunks --task deduplicate_cameras"
+echo
+echo "The merge keeps both copies of each seam photo (one per source chunk);"
+echo "deduplicate_cameras disables the extras so each photo is used once."

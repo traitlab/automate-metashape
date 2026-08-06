@@ -33,6 +33,17 @@ class MetashapeReferencePreselectionMode(str, Enum):
     Sequential = "Metashape.ReferencePreselectionSequential"
 
 
+class MetashapeChunkAlignmentMethod(str, Enum):
+    """Chunk alignment methods.
+
+    Not Metashape constants: Document.alignChunks takes a plain int, so these
+    readable names are mapped to it in src/ms_lib/process.py.
+    """
+    Points = "points"
+    Markers = "markers"
+    Cameras = "cameras"
+
+
 class MetashapeCalibrationFormat(str, Enum):
     """Camera calibration formats"""
     XML = "Metashape.CalibrationFormatXML"
@@ -128,6 +139,42 @@ class AlignPhotosConfig(BaseModel):
         if v not in valid_values:
             raise ValueError(f"downscale must be one of {valid_values}")
         return v
+
+
+class AlignChunksConfig(BaseModel):
+    """Configuration for aligning chunks (Metashape: Document.alignChunks)"""
+    enabled: bool = True
+    method: MetashapeChunkAlignmentMethod = MetashapeChunkAlignmentMethod.Cameras
+    fit_scale: bool = True
+    downscale: int = Field(default=1, ge=0, le=8)
+    generic_preselection: bool = False
+    filter_mask: bool = False
+    mask_tiepoints: bool = False
+    keypoint_limit: int = Field(default=40000, ge=0)
+
+    @field_validator('downscale')
+    @classmethod
+    def validate_downscale(cls, v):
+        valid_values = [0, 1, 2, 4, 8]
+        if v not in valid_values:
+            raise ValueError(f"downscale must be one of {valid_values}")
+        return v
+
+
+class MergeChunksConfig(BaseModel):
+    """Configuration for merging chunks (Metashape: Document.mergeChunks)"""
+    enabled: bool = True
+    merge_assets: bool = False
+    merge_markers: bool = False
+    merge_tiepoints: bool = False
+    copy_laser_scans: bool = True
+    copy_masks: bool = True
+    copy_depth_maps: bool = False
+    copy_point_clouds: bool = False
+    copy_models: bool = False
+    copy_tiled_models: bool = False
+    copy_elevations: bool = False
+    copy_orthomosaics: bool = False
 
 
 class BuildDepthMapsConfig(BaseModel):
@@ -254,6 +301,11 @@ class MetashapeConfig(BaseModel):
     # Processing steps
     addPhotos: AddPhotosConfig = Field(default_factory=AddPhotosConfig)
     alignPhotos: AlignPhotosConfig = Field(default_factory=AlignPhotosConfig)
+    # Multi-chunk steps. main.py processes one chunk per run and does not reach
+    # these; scripts/run_task.py does. They live here so their parameters come
+    # from the same config and the same validation as every other step.
+    alignChunks: AlignChunksConfig = Field(default_factory=AlignChunksConfig)
+    mergeChunks: MergeChunksConfig = Field(default_factory=MergeChunksConfig)
     buildDepthMaps: BuildDepthMapsConfig = Field(default_factory=BuildDepthMapsConfig)
     buildPointCloud: BuildPointCloudConfig = Field(default_factory=BuildPointCloudConfig)
     buildDem: BuildDemConfig = Field(default_factory=BuildDemConfig)
