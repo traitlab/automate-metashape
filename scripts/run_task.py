@@ -18,14 +18,18 @@ Run from the repository root with the Metashape environment activated:
         --project path/to/project.psx \
         --chunk "Chunk 1" \
         --task export_ortho \
-        --output out/ortho.tif
+        --output out/
 
-Repeat --task to chain steps in one document open/save cycle:
+Repeat --task to chain steps in one document open/save cycle. --output is a
+directory, so one run can write every product:
 
     python scripts/run_task.py \
         --project path/to/project.psx \
+        --chunk "Chunk 1" \
         --task build_dem --task build_orthomosaic \
-        --task export_ortho --output out/ortho.tif
+        --task export_ortho --task export_dem --task export_point_cloud \
+        --output out/
+    # -> out/Chunk_1_rgb.tif, out/Chunk_1_dsm.tif, out/Chunk_1_pg.copc.laz
 
 align_chunks and merge_chunks act on a set of chunks rather than one. Name them
 with --chunks (repeat it) or leave it out to take every chunk in the project;
@@ -147,28 +151,22 @@ def task_build_orthomosaic(doc, chunk, args):
 
 
 def task_export_ortho(doc, chunk, args):
-    require(args, "output")
-    export.export_orthomosaic(chunk, args.output, args.crs, config_file=args.config_file)
+    export.export_orthomosaic(chunk, output_path(args, chunk, "export_ortho"), args.crs,
+                              config_file=args.config_file)
 
 
 def task_export_dem(doc, chunk, args):
-    require(args, "output")
-    export.export_dem(chunk, args.output, args.crs, config_file=args.config_file)
+    export.export_dem(chunk, output_path(args, chunk, "export_dem"), args.crs,
+                      config_file=args.config_file)
 
 
 def task_export_point_cloud(doc, chunk, args):
-    require(args, "output")
-    export.export_point_cloud(chunk, args.output, args.crs, config_file=args.config_file)
-
-
-def task_export_model(doc, chunk, args):
-    require(args, "output")
-    export.export_model(chunk, args.output)
+    export.export_point_cloud(chunk, output_path(args, chunk, "export_point_cloud"),
+                              args.crs, config_file=args.config_file)
 
 
 def task_export_report(doc, chunk, args):
-    require(args, "output")
-    export.export_report(chunk, args.output)
+    export.export_report(chunk, output_path(args, chunk, "export_report"))
 
 
 TASKS = {
@@ -189,7 +187,6 @@ TASKS = {
     "export_ortho": task_export_ortho,
     "export_dem": task_export_dem,
     "export_point_cloud": task_export_point_cloud,
-    "export_model": task_export_model,
     "export_report": task_export_report,
 }
 
@@ -213,8 +210,15 @@ MUTATING_TASKS = set(TASKS) - {
     "export_ortho",
     "export_dem",
     "export_point_cloud",
-    "export_model",
     "export_report",
+}
+
+# Suffix each export task appends to the chunk label, as main.py names products.
+EXPORT_SUFFIXES = {
+    "export_ortho": "_rgb.tif",
+    "export_dem": "_dsm.tif",
+    "export_point_cloud": "_pg.copc.laz",
+    "export_report": "_report.pdf",
 }
 
 
@@ -222,6 +226,19 @@ def require(args, *names):
     missing = [n for n in names if getattr(args, n, None) is None]
     if missing:
         raise SystemExit(f"--{missing[0]} is required for this task")
+
+
+def safe_label(label):
+    """Chunk label reduced to something usable as a filename."""
+    cleaned = "".join(c if c.isalnum() or c in "-_." else "_" for c in label.strip())
+    return cleaned.strip("_") or "chunk"
+
+
+def output_path(args, chunk, task_name):
+    """Path an export task writes to: <--output>/<chunk label><product suffix>."""
+    require(args, "output")
+    os.makedirs(args.output, exist_ok=True)
+    return os.path.join(args.output, safe_label(chunk.label) + EXPORT_SUFFIXES[task_name])
 
 
 def parse_args(argv):
@@ -280,7 +297,11 @@ def parse_args(argv):
     parser.add_argument(
         "--multispectral", action="store_true", help="Treat photos as a multispectral set"
     )
-    parser.add_argument("--output", help="Output path (required by export_* tasks)")
+    parser.add_argument(
+        "--output",
+        help="Directory the export_* tasks write into, each file named\n"
+        "<chunk><product suffix>. Created if missing.",
+    )
     parser.add_argument(
         "-crs",
         "--crs",

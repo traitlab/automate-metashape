@@ -132,9 +132,5 @@ def export_point_cloud(
     chunk.exportPointCloud(**kwargs)
 
 
-def export_model(chunk, output_path):
-    chunk.exportModel(path=output_path)
-
-
 def export_report(chunk, output_path):
     chunk.exportReport(path=output_path)
