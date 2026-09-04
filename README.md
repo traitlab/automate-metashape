@@ -129,6 +129,45 @@ python ~/repos/automate-metashape/python/metashape_workflow.py --config_file ~/p
 
 <br/>
 
+#### Running individual steps on an existing project
+
+`main.py` runs a whole mission, and every step it runs acts on a single chunk. To run *one* step against a project that already exists — re-export a product in a different CRS, rebuild a DEM at a different resolution, or align and merge the chunks of a multi-chunk project — use `scripts/run_task.py`:
+
+```
+python scripts/run_task.py --project path/to/project.psx --chunk "Chunk 1" \
+    --task export_ortho --output out/ortho.tif
+```
+
+Repeat `--task` to chain steps in one open/save cycle:
+
+```
+python scripts/run_task.py --project path/to/project.psx \
+    --task build_dem --task build_orthomosaic \
+    --task export_ortho --output out/ortho.tif
+```
+
+`align_chunks` and `merge_chunks` act on a set of chunks rather than one. Name them with `--chunks` (repeat it) or leave it out to take every chunk in the project; the rest of the chain then continues on the merged chunk:
+
+```
+python scripts/run_task.py --project path/to/project.psx \
+    --chunks run_a --chunks run_b \
+    --task align_chunks --task merge_chunks --merged-label run_ab \
+    --task deduplicate_cameras \
+    --task build_depth_maps --task build_point_cloud
+```
+
+Chunks that overlap on purpose — so `align_chunks` has cameras in common to work from — leave their shared photos in the merged chunk twice, once per source chunk, because each copy was aligned from tie points the other doesn't have. `deduplicate_cameras` disables all but the first camera holding each photo path ([the script Agisoft give for it](https://www.agisoft.com/forum/index.php?topic=8587.0)); add `--remove-duplicates` to delete them instead of disabling them.
+
+The project is saved after each step that changes it, as the pipeline does, so a failure late in a chain doesn't discard the work before it. Pass `--no-save` for a throwaway run.
+
+Run it from the repository root. `--task` accepts the pipeline steps individually (`align`, `build_depth_maps`, `build_point_cloud`, `build_dem`, `build_orthomosaic`, the `*_highdis` second-pass variants, the `export_*` steps, and the multi-chunk steps above); `python scripts/run_task.py --help` lists them all.
+
+Processing parameters are **not** duplicated in the script — they are read from `config/config_lefolab_default.yml` (override with `--config-file`) through the same pydantic models `main.py` validates, so a step run this way uses exactly the settings the pipeline would have used. `--crs` defaults to the UTM zone of the median camera position, the same rule `main.py` applies to a fresh mission.
+
+Note this writes no processing log, so a product built this way has no provenance record of its own — use `main.py` for real missions. The `--create` and `add_photos` tasks exist for debugging only; they skip the mission_id convention, the mission lock, and the log.
+
+<br/>
+
 ### Workflow outputs
 
 The outputs of the workflow are the following:

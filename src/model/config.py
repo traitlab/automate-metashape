@@ -33,6 +33,17 @@ class MetashapeReferencePreselectionMode(str, Enum):
     Sequential = "Metashape.ReferencePreselectionSequential"
 
 
+class MetashapeChunkAlignmentMethod(str, Enum):
+    """Chunk alignment methods.
+
+    Not Metashape constants: Document.alignChunks takes a plain int, so these
+    readable names are mapped to it in src/ms_lib/process.py.
+    """
+    Points = "points"
+    Markers = "markers"
+    Cameras = "cameras"
+
+
 class MetashapeCalibrationFormat(str, Enum):
     """Camera calibration formats"""
     XML = "Metashape.CalibrationFormatXML"
@@ -128,6 +139,42 @@ class AlignPhotosConfig(BaseModel):
         if v not in valid_values:
             raise ValueError(f"downscale must be one of {valid_values}")
         return v
+
+
+class AlignChunksConfig(BaseModel):
+    """Configuration for aligning chunks (Metashape: Document.alignChunks)"""
+    enabled: bool = True
+    method: MetashapeChunkAlignmentMethod = MetashapeChunkAlignmentMethod.Cameras
+    fit_scale: bool = True
+    downscale: int = Field(default=1, ge=0, le=8)
+    generic_preselection: bool = False
+    filter_mask: bool = False
+    mask_tiepoints: bool = False
+    keypoint_limit: int = Field(default=40000, ge=0)
+
+    @field_validator('downscale')
+    @classmethod
+    def validate_downscale(cls, v):
+        valid_values = [0, 1, 2, 4, 8]
+        if v not in valid_values:
+            raise ValueError(f"downscale must be one of {valid_values}")
+        return v
+
+
+class MergeChunksConfig(BaseModel):
+    """Configuration for merging chunks (Metashape: Document.mergeChunks)"""
+    enabled: bool = True
+    merge_assets: bool = False
+    merge_markers: bool = False
+    merge_tiepoints: bool = False
+    copy_laser_scans: bool = True
+    copy_masks: bool = True
+    copy_depth_maps: bool = False
+    copy_point_clouds: bool = False
+    copy_models: bool = False
+    copy_tiled_models: bool = False
+    copy_elevations: bool = False
+    copy_orthomosaics: bool = False
 
 
 class BuildDepthMapsConfig(BaseModel):
@@ -242,6 +289,7 @@ class MetashapeConfig(BaseModel):
     input_crs: str = "EPSG::4326"
     project_crs: str = ""
     load_project: str = ""
+    new_chunk: bool = False
     subdivide_task: bool = True
     use_cuda: bool = True
     gpu_multiplier: int = Field(default=2, ge=1)
@@ -253,6 +301,11 @@ class MetashapeConfig(BaseModel):
     # Processing steps
     addPhotos: AddPhotosConfig = Field(default_factory=AddPhotosConfig)
     alignPhotos: AlignPhotosConfig = Field(default_factory=AlignPhotosConfig)
+    # Multi-chunk steps. main.py processes one chunk per run and does not reach
+    # these; scripts/run_task.py does. They live here so their parameters come
+    # from the same config and the same validation as every other step.
+    alignChunks: AlignChunksConfig = Field(default_factory=AlignChunksConfig)
+    mergeChunks: MergeChunksConfig = Field(default_factory=MergeChunksConfig)
     buildDepthMaps: BuildDepthMapsConfig = Field(default_factory=BuildDepthMapsConfig)
     buildPointCloud: BuildPointCloudConfig = Field(default_factory=BuildPointCloudConfig)
     buildDem: BuildDemConfig = Field(default_factory=BuildDemConfig)
@@ -357,7 +410,7 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
         else:
             raise ValueError(
                 f"Could not extract valid mission_id from images path: '{mission_id}'."
-                "mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
+                " mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
             )
     
     # Raise error if mission_id is still not set
@@ -372,7 +425,10 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
     mission_year = mission_id[:4]
     
     if not config_dict.get('project_path'):
-        config_dict['project_path'] = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{mission_id}"
+        if config_dict.get('load_project'):
+            config_dict['project_path'] = os.path.dirname(config_dict['load_project'])
+        else:
+            config_dict['project_path'] = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{mission_id}"
     
     if not config_dict.get('output_path'):
         config_dict['output_path'] = f"{config_dict['project_path']}/metashape/"
@@ -380,17 +436,12 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
     # Calculate project_crs from photos if not provided
     if not config_dict.get('project_crs') and config_dict.get('images_path'):
         images_path = config_dict['images_path']
-        
-        # Handle list of paths - concatenate all paths
-        if isinstance(images_path, list):
-            all_images = []
-            for path in images_path:
-                all_images.append(path)
-            images_path = all_images
+        print("[INFO] Calculating project CRS from photos...")
         
         try:
             median_latitude, median_longitude = calculate_median_coordinates(images_path)
             config_dict['project_crs'] = calculate_utm_epsg(median_latitude, median_longitude)
+            print(f"[INFO] Using {config_dict['project_crs']} as project CRS based on median photo coordinates.")
         except Exception as e:
             raise ValueError(
                 f"Failed to calculate project_crs from photos: {e}\n"

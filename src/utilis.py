@@ -50,7 +50,13 @@ def calculate_median_coordinates(images_path):
                     except Exception as e:
                         print(f"Error processing {image_path}: {e}")
 
-    if os.path.isdir(images_path):
+    if isinstance(images_path, list):
+        for path in images_path:
+            if os.path.isdir(path):
+                process_folder(path)
+            else:
+                raise ValueError(f"{path} is not a valid directory.")
+    elif os.path.isdir(images_path):
         process_folder(images_path)
     else:
         raise ValueError(f"{images_path} is not a valid directory.")

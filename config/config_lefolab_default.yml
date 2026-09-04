@@ -26,8 +26,9 @@ input_crs: "EPSG::4326"
 project_crs: ""
 
 # Project to load. If blank, creates a new empty project.
-# Even if loading an existing project, all processing is saved as a new project. The original project file is not modified.
+# Even if loading an existing project, all processing is saved as a new project. The original project file is not modified (except when new_chunk is enabled).
 load_project: ""
+new_chunk: False # When loading an existing project, should a new chunk be created inside the loaded project?
 
 #### Processing parameters:
 ## It is best to leave the default settings of this section unchanged.
@@ -43,6 +44,7 @@ addPhotos: # (Metashape: addPhotos)
   use_xmp_accuracy: True # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
   photos_accuracy: 5 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
   load_reference: True
+  import_reference: False # Whether to import new reference for photos (DJI PPK csv) from a file. Default is False.
   load_xmp_calibration: True
   load_xmp_orientation: True
   load_xmp_accuracy: True
@@ -78,6 +80,36 @@ alignPhotos: # (Metashape: matchPhotos, alignCameras)
     tiepoint_limit: 0 # Default to 4000, 0 for no limit
 
 gcps: False # Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --gcps to continue.
+
+# The two steps below act on several chunks at once, so main.py doesn't run them currently (it processes one chunk per run).
+# They are reached through 'python scripts/run_task.py --task align_chunks --task merge_chunks', the scripted equivalent
+# of the GUI's Workflow -> Align Chunks / Merge Chunks.
+# A photo held by two of the merged chunks stays as two cameras in the merged chunk: each was aligned from its own chunk's
+# tie points, which the other copy doesn't have. Run '--task deduplicate_cameras' afterwards to leave one camera per photo.
+alignChunks: # (Metashape: Document.alignChunks)
+    enabled: True
+    method: cameras # How to match chunks to each other. Options: points, markers, cameras. "cameras" matches cameras by label, use "points" for chunks that share no cameras, "markers" for GCP-based alignment. Note Metashape's own default is "points".
+    fit_scale: True # Allow chunk scale to change during alignment. Set to False for RTK-georeferenced chunks, whose scale is already known.
+    downscale: 1 # Alignment accuracy, only used by the "points" method. (0 - Highest, 1 - High, 2 - Medium, 4 - Low, 8 - Lowest)
+    generic_preselection: False # Use a coarsened version of each photo to narrow down the pairs to match. Only used by the "points" method.
+    filter_mask: False # Filter points by mask.
+    mask_tiepoints: False # Apply the mask filter to tie points.
+    keypoint_limit: 60000 # Maximum number of points per photo, only used by the "points" method.
+
+mergeChunks: # (Metashape: Document.mergeChunks)
+    enabled: True
+    merge_assets: True # Merge the default assets of the source chunks.
+    merge_markers: False # Merge markers (matched by label).
+    merge_tiepoints: False # Merge tie points.
+    # The copy_* flags below decide which built products come across into the merged chunk.
+    copy_laser_scans: True
+    copy_masks: True
+    copy_depth_maps: True
+    copy_point_clouds: True
+    copy_models: True
+    copy_tiled_models: True
+    copy_elevations: True
+    copy_orthomosaics: True
 
 buildDepthMaps: # (Metashape: buildDepthMaps)
     enabled: True

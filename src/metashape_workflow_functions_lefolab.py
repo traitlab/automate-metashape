@@ -5,6 +5,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -96,48 +97,155 @@ class MetashapeWorkflowLefolab:
         Execute metashape workflow steps based on config file
         """
         self.processing_start_time = time.time()
-        
-        self.project_setup()
 
-        self.enable_and_log_gpu()
+        # Make a plain `kill` (SIGTERM) raise SystemExit so the finally block
+        # below releases the mission lock instead of leaving it behind
+        try:
+            signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(128 + signum))
+        except ValueError:
+            pass  # signal handlers can only be set from the main thread
 
-        # Process thermal images if enabled
-        if self.cfg["thermal"]:
-            self.process_thermal_images()
+        try:
+            self.project_setup()
 
-        # Skip add_photos and align_photos if resuming after GCPs
-        if not self.after_gcps:
-            # Add photos
-            if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
-                self.add_photos()
+            self.enable_and_log_gpu()
 
-            # Align photos
-            if self.cfg["alignPhotos"]["enabled"]:
-                self.align_photos()
-                self.reset_region()
+            # Skip thermal process, add_photos and align_photos if resuming after GCPs
+            if not self.after_gcps:
+                # Process thermal images if enabled
+                if self.cfg["thermal"]:
+                    self.process_thermal_images()
 
-        # Add GCPs manually via GUI if specified
-        if self.cfg["gcps"]:
-            self.add_gcps()
-            return
+                # Add photos
+                if (self.cfg["images_path"] != "") and (self.cfg["addPhotos"]["enabled"]):
+                    self.add_photos()
 
-        if self.cfg["buildDepthMaps"]["enabled"]:
-            self.build_depth_maps()
+                # Align photos
+                if self.cfg["alignPhotos"]["enabled"]:
+                    self.align_photos()
+                    self.reset_region()
 
-        if self.cfg["buildPointCloud"]["enabled"]:
-            self.build_point_cloud()
+            # Add GCPs manually via GUI if specified
+            if self.cfg["gcps"]:
+                self.add_gcps()
+                return
 
-        # For this step, the check for whether it is enabled in the config happens inside the function, because there are two steps (DEM and ortho), each of which can be enabled independently
-        self.build_dem_orthomosaic()
+            if self.cfg["buildDepthMaps"]["enabled"]:
+                self.build_depth_maps()
 
-        if not self.cfg["quick_process"]:
-            self.build_depth_maps_highdis()
-            self.build_point_cloud_highdis()
-            self.build_dem_highdis()
+            if self.cfg["buildPointCloud"]["enabled"]:
+                self.build_point_cloud()
 
-        self.export_report()
+            # For this step, the check for whether it is enabled in the config happens inside the function, because there are two steps (DEM and ortho), each of which can be enabled independently
+            self.build_dem_orthomosaic()
 
-        self.finish_run()
+            if not self.cfg["quick_process"]:
+                self.build_depth_maps_highdis()
+                self.build_point_cloud_highdis()
+                self.build_dem_highdis()
+
+            self.export_report()
+
+            self.finish_run()
+        finally:
+            self._release_mission_lock()
+
+    def _acquire_mission_lock(self):
+        """
+        Atomically claim <project_path>/<mission_id>.lock so the same mission cannot
+        be processed twice concurrently. A lock left behind by a killed process is
+        removed automatically if it was created on this node and its PID is dead;
+        a lock from another node must be verified and removed manually.
+        """
+        self.mission_lock_file = os.path.join(self.cfg["project_path"], self.cfg["mission_id"] + ".lock")
+        self._mission_lock_acquired = False
+
+        for _ in range(2):
+            try:
+                fd = os.open(self.mission_lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                with os.fdopen(fd, "w") as file:
+                    file.write(f"node: {platform.node()}\npid: {os.getpid()}\nstarted: {stamp_time()}\n")
+                self._mission_lock_acquired = True
+                return
+            except FileExistsError:
+                node, pid = self._read_mission_lock()
+                if node == platform.node() and pid is not None and not self._pid_is_alive(pid):
+                    print(f"[INFO] Removing stale mission lock left by dead PID {pid} on this node.")
+                    try:
+                        os.remove(self.mission_lock_file)
+                    except FileNotFoundError:
+                        pass
+                    continue
+                raise RuntimeError(
+                    f"Mission {self.cfg['mission_id']} is already being processed"
+                    f" (node: {node}, PID: {pid}, lock file: {self.mission_lock_file})."
+                    " If that process was killed, verify with 'ps -p <pid>' on that node,"
+                    " then delete the lock file and relaunch."
+                )
+        raise RuntimeError(f"Could not acquire mission lock: {self.mission_lock_file}")
+
+    def _read_mission_lock(self):
+        """
+        Read node and PID from an existing mission lock file
+        """
+        node, pid = "unknown", None
+        try:
+            with open(self.mission_lock_file) as file:
+                for line in file:
+                    key, _, value = line.partition(":")
+                    if key.strip() == "node":
+                        node = value.strip()
+                    elif key.strip() == "pid" and value.strip().isdigit():
+                        pid = int(value.strip())
+        except OSError:
+            pass
+        return node, pid
+
+    @staticmethod
+    def _pid_is_alive(pid):
+        # Determine whether a PID belongs to a process that is still actively
+        # holding the lock. A process that no longer exists is dead; so is one
+        # that is a zombie (Z, already exited, waiting to be reaped) or stopped
+        # (T/t, suspended and making no progress) -- in both cases the run is
+        # not proceeding, so the lock should be reclaimable on this node.
+        # Only meaningful on POSIX; elsewhere assume alive to stay safe.
+        if os.name != "posix":
+            return True
+
+        # On Linux, inspect the process state directly so zombie and stopped
+        # processes do not falsely keep the lock held.
+        try:
+            with open(f"/proc/{pid}/stat") as file:
+                # The state is the field after the (comm) parenthesised name,
+                # which may itself contain spaces/parentheses.
+                state = file.read().rpartition(")")[2].split()[0]
+            # Z = zombie (defunct), T = stopped, t = tracing stop.
+            return state not in ("Z", "T", "t")
+        except FileNotFoundError:
+            return False
+        except (OSError, IndexError):
+            pass
+
+        # Fall back to signal 0: performs no action but fails if the PID does
+        # not exist. Used on non-Linux POSIX systems without /proc.
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    def _release_mission_lock(self):
+        """
+        Remove the mission lock file, only if this run acquired it
+        """
+        if getattr(self, "_mission_lock_acquired", False):
+            try:
+                os.remove(self.mission_lock_file)
+            except FileNotFoundError:
+                pass
+            self._mission_lock_acquired = False
 
     def project_setup(self):
         """
@@ -152,6 +260,9 @@ class MetashapeWorkflowLefolab:
         # Ensure project path exists
         os.makedirs(self.cfg["project_path"], exist_ok=True)
 
+        # Prevent two concurrent runs of the same mission
+        self._acquire_mission_lock()
+
         mission_id = self.cfg["mission_id"]
 
         # Project file name format: "missionID_YYYY-MM-DDtHHMM.psx"
@@ -162,11 +273,19 @@ class MetashapeWorkflowLefolab:
         self.project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
         self.log_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"]))
 
-        if os.path.exists(self.project_file) and not self.cfg["load_project"]:
-            raise FileExistsError(
-                f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}."
-                "Please retry in a minute or use --load-project to open the existing project."
-            )
+        if not self.cfg["load_project"]:
+            # Claim the project file atomically (O_EXCL) so two runs started in the
+            # same minute cannot both pass an exists() check before either has saved.
+            # The empty placeholder is overwritten by doc.save() below.
+            try:
+                fd = os.open(self.project_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.close(fd)
+            except FileExistsError:
+                raise FileExistsError(
+                    f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}. "
+                    "Another run may have claimed it first. "
+                    "Please retry in a minute or use --load-project to open the existing project."
+                )
 
         """
         Create a doc and a chunk
@@ -176,29 +295,37 @@ class MetashapeWorkflowLefolab:
 
         # If specified, open existing project
         if self.cfg["load_project"] != "":
-            self.doc.open(self.cfg["load_project"])
+            self.doc.open(self.cfg["load_project"], ignore_lock=True)
 
-            # Raise error if the project does not have a chunk, or has multiple chunks
-            if len(self.doc.chunks) == 0:
-                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks.")
-            if len(self.doc.chunks) > 1:
-                raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk.")
+            # Check if new_chunk is enabled
+            if self.cfg["new_chunk"]:
+                # Create a new chunk in the existing project and make it active
+                chunk = self.doc.addChunk()
+                chunk.label = mission_id
+                chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
+                self.doc.chunk = chunk
+            else:
+                # Raise error if the project does not have a chunk, or has multiple chunks
+                if len(self.doc.chunks) == 0:
+                    raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks.")
+                if len(self.doc.chunks) > 1:
+                    raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk.")
 
-            # If cameras are already present, make sure they exist and their paths are identical to their labels
-            if self.doc.chunk.cameras:
-                for camera in self.doc.chunk.cameras:
-                    photo_path = camera.photo.path
-                    if not os.path.exists(photo_path):
-                        # If the path does not exist, try to set it to the label
-                        if os.path.exists(camera.label):
-                            camera.photo.path = camera.label
-                        else:
-                            raise FileNotFoundError(f"Photo path for camera '{camera.label}' does not exist: {photo_path}")
-                        
-            # If markers exist, set after_gcps to True
-            if self.doc.chunk.markers:
-                self.after_gcps = True
-                self.cfg["gcps"] = False
+                # If cameras are already present, make sure they exist and their paths are identical to their labels
+                if self.doc.chunk.cameras:
+                    for camera in self.doc.chunk.cameras:
+                        photo_path = camera.photo.path
+                        if not os.path.exists(photo_path):
+                            # If the path does not exist, try to set it to the label
+                            if os.path.exists(camera.label):
+                                camera.photo.path = camera.label
+                            else:
+                                raise FileNotFoundError(f"Photo path for camera '{camera.label}' does not exist: {photo_path}")
+                            
+                # If markers exist, set after_gcps to True
+                if self.doc.chunk.markers:
+                    self.after_gcps = True
+                    self.cfg["gcps"] = False
         else:
             # Use absolute paths for photos to solve path issues when opening with GUI
             Metashape.app.settings.project_absolute_paths = True
@@ -208,8 +335,13 @@ class MetashapeWorkflowLefolab:
             chunk.label = mission_id
             chunk.crs = Metashape.CoordinateSystem(self.cfg["input_crs"])
 
-        # Save doc as new project (even if an existing project was opened, save as a separate one)
-        # self.doc.save(project_file)
+        # Save doc as new project (or save to same project if new_chunk is enabled)
+        if not self.cfg["gcps"]:
+            # If new_chunk is enabled and we loaded a project, save to the loaded project path
+            if self.cfg["new_chunk"] and self.cfg["load_project"] != "":
+                self.doc.save()
+            else:
+                self.doc.save(self.project_file)
 
         """
         Log specs except for GPU
@@ -379,29 +511,33 @@ class MetashapeWorkflowLefolab:
                 
                 # Use extracted values if not provided
                 if humidity is None:
-                    humidity = weather_mean.get('RH', 70.0)  # Default to 70 if column not found
-                    print(f"  Extracted humidity: {humidity:.1f}%")
-                
+                    if 'RH' in weather_mean and weather_mean['RH'] is not None:
+                        humidity = weather_mean['RH']
+                        print(f"  Extracted humidity: {humidity:.1f}%")
+                    else:
+                        raise ValueError(
+                            "Humidity value is required but could not be determined from weather data and was not provided in the config."
+                        )
+
                 if reflection is None:
-                    reflection = weather_mean.get('AirT_C_Avg', 25.0)  # Default to 25 if column not found
-                    print(f"  Extracted reflection temperature: {reflection:.1f}°C")
-                    
+                    if 'AirT_C_Avg' in weather_mean and weather_mean['AirT_C_Avg'] is not None:
+                        reflection = weather_mean['AirT_C_Avg']
+                        print(f"  Extracted reflection temperature: {reflection:.1f}°C")
+                    else:
+                        raise ValueError(
+                            "Reflection temperature is required but could not be determined from weather data and was not provided in the config."
+                        )
+
             except Exception as e:
-                print(f"  Warning: Could not extract weather data\n  {e}")
-                print(f"  Using default values: humidity=70%, reflection=25°C")
-                humidity = humidity if humidity is not None else 70.0
-                reflection = reflection if reflection is not None else 25.0
-        else:
-            # Use defaults if not provided and no weather station
-            humidity = humidity if humidity is not None else 70.0
-            reflection = reflection if reflection is not None else 25.0
+                raise ValueError(f"Could not extract weather data\n  {e}")
         
         # Process each images path
         for images_path in images_paths:
             print(f"Processing thermal images in: {images_path}")
             
             # Define output directory for calibrated thermal images
-            out_dir = "/mnt/nfs/lefodata/upload/tmp/thermal/" + self.run_id + "/"
+            # out_dir = "/mnt/nfs/lefodata/upload/tmp/thermal/" + self.run_id + "/" 
+            out_dir = "/mnt/nfs/conrad/labolaliberte_upload/tmp/thermal/" + self.run_id + "/" #lefodata access broken
             
             # Path to R script
             r_script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "R", "dji_m3t_rpeg_to_tif_v2_lefolab.r")
@@ -440,6 +576,8 @@ class MetashapeWorkflowLefolab:
         # Record processing time to log file
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Thermal Image Processing", time8]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["  Humidity (%)", f"{humidity:.1f}"]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["  Reflection (°C)", f"{reflection:.1f}"]) + "\n")
         
         return True
 
@@ -461,10 +599,16 @@ class MetashapeWorkflowLefolab:
             ## Get paths to all the project photos
             a = glob.iglob(os.path.join(images_path, "**", "*.*"), recursive=True)
             b = [path for path in a]
-            photo_files = [
-                x for x in b 
-                if re.search(r"\.(tif|jpg)$", x, re.IGNORECASE)
-            ]
+            if self.cfg["thermal"]:
+                photo_files = [
+                    x for x in b 
+                    if re.search(r"\.tif$", x, re.IGNORECASE)
+                ]
+            else:
+                photo_files = [
+                    x for x in b 
+                    if re.search(r"\.jpg$", x, re.IGNORECASE)
+                ]
 
             if self.cfg["addPhotos"]["multispectral"]:
                 self.doc.chunk.addPhotos(
@@ -483,6 +627,19 @@ class MetashapeWorkflowLefolab:
         for camera in self.doc.chunk.cameras:
             path = camera.photo.path
             camera.label = path
+
+        # If specified, import reference for photos from a file (e.g. DJI PPK csv)
+        if self.cfg["addPhotos"]["import_reference"]:
+            reference_path = f'{images_paths[0]}/{self.cfg["mission_id"]}_POS.txt'
+            if os.path.exists(reference_path):
+                self.doc.chunk.importReference(reference_path, Metashape.ReferenceFormatCSV, delimiter=',',
+                                               skip_rows=1, crs = Metashape.CoordinateSystem(self.cfg["input_crs"]),
+                                               load_rotation=True, load_location_accuracy=True,
+                                               column_label=1, column_x=3, column_y=2, column_z=4,
+                                               column_sx=8, column_sy=8, column_sz=9, 
+                                               column_a=5, column_b=6, column_c=7)
+            else:
+                raise FileNotFoundError(f"Reference import specified but reference file not found at expected path: {reference_path}")
 
         # If specified, change the accuracy of the cameras for custom value
         if self.cfg["addPhotos"]["use_xmp_accuracy"] == False:
@@ -512,7 +669,8 @@ class MetashapeWorkflowLefolab:
             
             sensor.fixed_params=self.cfg["cameracalibration"]["fixed_parameters"]
 
-        #self.doc.save()
+        if not self.cfg["gcps"]:
+            self.doc.save()
 
         return True
 
@@ -540,7 +698,9 @@ class MetashapeWorkflowLefolab:
             subdivide_task=self.cfg["subdivide_task"],
             reset_alignment=self.cfg["alignPhotos"]["reset_alignment"],
         )
-        #self.doc.save()
+        
+        if not self.cfg["gcps"]:
+            self.doc.save()
 
         timer1b = time.time()
         time1 = diff_time(timer1b, timer1a)
@@ -580,7 +740,11 @@ class MetashapeWorkflowLefolab:
                 new_path = old_path.replace("/mnt/nfs/conrad/", "//conrad-irbv.irbv.umontreal.ca/")
                 camera.photo.path = new_path
 
-        self.doc.save(self.project_file)
+        # Save to the appropriate project file
+        if self.cfg["new_chunk"] and self.cfg["load_project"] != "":
+            self.doc.save()
+        else:
+            self.doc.save(self.project_file)
 
         print("[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, and rerun with --load-project and --gcps to resume processing.")
         gui_path = self.doc.path.replace('/mnt/nfs/conrad/', '//conrad-irbv.irbv.umontreal.ca/').replace('/', '\\')
@@ -610,7 +774,7 @@ class MetashapeWorkflowLefolab:
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time2]) + "\n")
 
-        self.doc.save(self.project_file)
+        self.doc.save()
 
     def build_point_cloud(self):
         """
@@ -663,7 +827,7 @@ class MetashapeWorkflowLefolab:
                     source_data=Metashape.PointCloudData,
                     format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
-                    clases=self.cfg["buildPointCloud"]["classes"],
+                    classes=self.cfg["buildPointCloud"]["classes"],
                     subdivide_task=self.cfg["subdivide_task"],
                 )
 
@@ -815,7 +979,12 @@ class MetashapeWorkflowLefolab:
         if self.cfg["buildPointCloud"]["remove_after_export"]:
             self.doc.chunk.remove(self.doc.chunk.point_clouds)
 
-        self.doc.save()
+        if (
+            self.cfg["buildDem"]["enabled"]
+            or self.cfg["buildOrthomosaic"]["enabled"]
+            or self.cfg["buildPointCloud"]["remove_after_export"]
+        ):
+            self.doc.save()
 
         return True
 
@@ -904,9 +1073,9 @@ class MetashapeWorkflowLefolab:
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps", time5]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps - HighDis", time5]) + "\n")
 
-        #self.doc.save()
+        self.doc.save()
 
     def build_point_cloud_highdis(self):
         """
@@ -927,7 +1096,7 @@ class MetashapeWorkflowLefolab:
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud", time6]) + "\n")
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud - HighDis", time6]) + "\n")
 
         self.doc.save()
 
@@ -959,7 +1128,7 @@ class MetashapeWorkflowLefolab:
                     source_data=Metashape.PointCloudData,
                     format=Metashape.PointCloudFormatCOPC,
                     crs=Metashape.CoordinateSystem(self.cfg["project_crs"]),
-                    clases=self.cfg["buildPointCloudHighDis"]["classes"],
+                    classes=self.cfg["buildPointCloudHighDis"]["classes"],
                     subdivide_task=self.cfg["subdivide_task"],
                 )
 
@@ -1185,20 +1354,24 @@ class MetashapeWorkflowLefolab:
 
         # Cleanup project files if required
         if self.cfg["delete_project"]:
-            project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
-            project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
-            
+            if self.cfg["new_chunk"] and self.cfg["load_project"] != "":
+                project_file = self.cfg["load_project"]
+                project_files_dir = os.path.splitext(project_file)[0] + ".files"
+            else:
+                project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
+                project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
+
             if os.path.exists(project_file):
                 os.remove(project_file)
-            
+
             # Delete the .files directory if it exists
             if os.path.exists(project_files_dir):
                 shutil.rmtree(project_files_dir)
-            
+
             # Delete the log file
             if os.path.exists(self.log_file):
                 os.remove(self.log_file)
-            
+
             print("[INFO] Project files deleted (output files preserved).")
 
         return True

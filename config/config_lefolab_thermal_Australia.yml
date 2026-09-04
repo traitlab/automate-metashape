@@ -26,8 +26,9 @@ input_crs: "EPSG::7844"
 project_crs: "EPSG::7850"
 
 # Project to load. If blank, creates a new empty project.
-# Even if loading an existing project, all processing is saved as a new project. The original project file is not modified.
+# Even if loading an existing project, all processing is saved as a new project. The original project file is not modified (except when new_chunk is enabled).
 load_project: ""
+new_chunk: False # When loading an existing project, should a new chunk be created inside the loaded project?
 
 #### Processing parameters:
 ## It is best to leave the default settings of this section unchanged.
@@ -43,6 +44,7 @@ addPhotos: # (Metashape: addPhotos)
   use_xmp_accuracy: False # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
   photos_accuracy: 1 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
   load_reference: True
+  import_reference: False # Whether to import new reference for photo (DJI PPK csv) from a file. Default is False.
   load_xmp_calibration: True
   load_xmp_orientation: True
   load_xmp_accuracy: True
