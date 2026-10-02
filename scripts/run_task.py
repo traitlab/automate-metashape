@@ -105,9 +105,23 @@ def task_merge_chunks(doc, chunk, args):
 
 
 def task_deduplicate_cameras(doc, chunk, args):
-    count = process.deduplicate_cameras(chunk, remove=args.remove_duplicates)
-    verb = "removed" if args.remove_duplicates else "disabled"
-    print(f"[run_task] {verb} {count} duplicate cameras in '{chunk.label}'")
+    report = process.deduplicate_cameras(chunk, remove=args.remove_duplicates,
+                                         reset=args.reset_duplicates)
+    verb = "removed" if report["removed"] else "disabled"
+    if report["reset"]:
+        print(f"[run_task] re-enabled {report['reset']} duplicate cameras a previous "
+              "run had disabled")
+    # One block per seam: what the losing side cost, so the choice is checkable
+    # against the Reference pane.
+    for seam in report["seams"]:
+        print(f"[run_task] seam of {seam['photos']} photos held by "
+              f"{len(seam['groups'])} groups:")
+        for group in seam["groups"]:
+            print(f"[run_task]   {group['name']}: mean error "
+                  f"{group['mean_error']:.3f} m over {group['measured']} of "
+                  f"{group['cameras']} duplicated cameras")
+        print(f"[run_task]   keeping {seam['winner']}")
+    print(f"[run_task] {verb} {report['count']} duplicate cameras in '{chunk.label}'")
 
 
 def task_reset_region(doc, chunk, args):
@@ -275,6 +289,14 @@ def parse_args(argv):
         action="store_true",
         help="Make deduplicate_cameras delete the duplicate cameras instead of\n"
         "disabling them. Deleting also drops the tie points they were aligned from.",
+    )
+    parser.add_argument(
+        "--reset-duplicates",
+        action="store_true",
+        help="Have deduplicate_cameras re-enable the duplicate cameras a previous\n"
+        "run disabled before deciding, so a chunk deduplicated by an older rule\n"
+        "is judged again from scratch. Only cameras sharing a photo with another\n"
+        "camera are re-enabled.",
     )
     parser.add_argument(
         "--input-crs", default="EPSG::4326", help="Input CRS for a newly created chunk"

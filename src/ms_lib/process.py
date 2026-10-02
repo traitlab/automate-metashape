@@ -391,36 +391,185 @@ def merge_chunks(
     return merged_chunk
 
 
-def deduplicate_cameras(chunk, remove=False):
-    """Disable the cameras that repeat a photo already present in the chunk.
+def _reference_error(chunk, camera):
+    """Metres between a camera's estimated centre and the location it carries.
+
+    The number Metashape shows as "Error (m)" in the Reference pane: estimated
+    centre and reference location both brought to geocentric coordinates and
+    differenced in the local east-north-up frame, so the result is metres
+    whatever units the chunk CRS is in.
+
+    Returns None for a camera that is not aligned or carries no reference,
+    which has no error to compare.
+    """
+    if camera.transform is None or camera.reference.location is None:
+        return None
+
+    estimated = chunk.transform.matrix.mulp(camera.center)
+    reference = chunk.crs.unproject(camera.reference.location)
+    return chunk.crs.localframe(estimated).mulv(estimated - reference).norm()
+
+
+def deduplicate_cameras(chunk, remove=False, reset=False):
+    """Disable the repeated photos on the worse side of each seam.
 
     Chunks that overlap on purpose -- so that align_chunks has cameras in common
     to work from -- leave the merged chunk holding the shared photos twice, once
     per source chunk (see merge_chunks). Left alone, those photos contribute
     twice to everything built next.
 
-    Duplicates are found by photo path, keeping the first camera that holds each
-    path in chunk order. Already-disabled cameras are skipped, so running this
-    twice changes nothing the second time. This follows the script Agisoft give
-    for it: https://www.agisoft.com/forum/index.php?topic=8587.0
+    Both copies of a photo carry the same reference location but were aligned
+    from different tie points, so each sits at its own estimated position with
+    its own reference error. Keeping whichever copy comes first in chunk order
+    (what the Agisoft script does, https://www.agisoft.com/forum/index.php?topic=8587.0)
+    therefore leaves the survivors scattered across both source chunks, picked
+    on nothing but camera order. This instead decides a whole seam at once:
+
+    * duplicates are split by camera group. merge_chunks brings each source
+      chunk's groups across unchanged, and the overlap folder is its own group
+      in each source chunk, so a seam's photos land in exactly one group per
+      source chunk and the group says which chunk a copy came from.
+    * groups that share duplicated photos are ranked together, one decision per
+      seam, so a run in the middle of a chain can win one seam and lose the
+      other.
+    * the group whose contested cameras have the lowest mean reference error
+      keeps all of its copies; every copy in the other groups is disabled.
+
+    The decision is strict: a photo is kept from the winning group even where
+    that copy is unaligned, so each seam is served by one uninterrupted block of
+    cameras. A chunk with no transform, or a group whose contested cameras carry
+    no usable reference, raises rather than falling back to chunk order.
+
+    Already-disabled cameras are skipped, so running this twice changes nothing
+    the second time -- and a chunk deduplicated by an older rule keeps that
+    older outcome. ``reset=True`` re-enables the disabled copies first so the
+    seam is decided again from scratch; it only touches cameras whose photo is
+    held by another camera, leaving cameras disabled for their own sake alone.
 
     Disabling rather than deleting is the default because a camera carries the
     tie points it was aligned from, and the duplicate that survives does not
-    have them. Pass ``remove=True`` to delete the duplicates outright.
+    have them. Pass ``remove=True`` to delete them outright -- which makes the
+    step one-way, as there is then nothing left for ``reset`` to bring back.
 
-    Returns the number of cameras disabled (or removed).
+    Returns a report dict -- ``count`` cameras disabled (or removed), ``removed``
+    saying which, ``reset`` how many were re-enabled first, and one ``seams``
+    entry per decision for the caller to print.
     """
-    seen = set()
-    duplicates = []
-
+    by_path = {}
     for camera in chunk.cameras:
-        if not camera.enabled or camera.photo is None:
+        if camera.photo is None:
             continue
-        path = camera.photo.path
-        if path in seen:
-            duplicates.append(camera)
-        else:
-            seen.add(path)
+        if not camera.enabled and not reset:
+            continue
+        by_path.setdefault(camera.photo.path, []).append(camera)
+
+    contested = {path: cams for path, cams in by_path.items() if len(cams) > 1}
+    if not contested:
+        return {"count": 0, "removed": remove, "reset": 0, "seams": []}
+
+    reset_count = 0
+    if reset:
+        for cams in contested.values():
+            for camera in cams:
+                if not camera.enabled:
+                    camera.enabled = True
+                    reset_count += 1
+
+    if chunk.transform is None or chunk.transform.matrix is None:
+        raise RuntimeError(
+            f"chunk '{chunk.label}' has no transform, so its cameras have no "
+            "reference error to rank the duplicate groups by. Align the chunks "
+            "before deduplicating."
+        )
+
+    groups = {group.key: group for group in chunk.camera_groups}
+    positions = {key: index for index, key in enumerate(groups, start=1)}
+    total = len(groups)
+
+    def group_key(camera):
+        return camera.group.key if camera.group is not None else None
+
+    def group_name(key):
+        """Name a group the way it can be found in the Workspace pane.
+
+        The pipeline never labels the groups it creates (add_photos), and the
+        GUI numbers the unlabelled ones per chunk, so after a merge several read
+        as "Group 1". Position in the chunk's group list is what matches what is
+        on screen; the key is what is unambiguous.
+        """
+        if key is None:
+            return "cameras in no group"
+        label = groups[key].label
+        shown = repr(label) if label else "unlabelled"
+        return f"group {positions[key]} of {total} ({shown}, key {key})"
+
+    # Union the groups that share duplicated photos: each connected set of
+    # groups is one seam, decided on its own.
+    parent = {}
+
+    def find(key):
+        parent.setdefault(key, key)
+        while parent[key] != key:
+            parent[key] = parent[parent[key]]
+            key = parent[key]
+        return key
+
+    def union(left, right):
+        left, right = find(left), find(right)
+        if left != right:
+            parent[right] = left
+
+    for cams in contested.values():
+        keys = [group_key(camera) for camera in cams]
+        for other in keys[1:]:
+            union(keys[0], other)
+
+    seams = {}
+    for path, cams in contested.items():
+        seam = seams.setdefault(find(group_key(cams[0])), {"paths": [], "groups": {}})
+        seam["paths"].append(path)
+        for camera in cams:
+            seam["groups"].setdefault(group_key(camera), []).append(camera)
+
+    duplicates = []
+    report = []
+
+    for seam in sorted(seams.values(), key=lambda s: min(positions.get(k, 0) for k in s["groups"])):
+        scores = {}
+        for key, cams in seam["groups"].items():
+            errors = [e for e in (_reference_error(chunk, c) for c in cams) if e is not None]
+            if not errors:
+                raise RuntimeError(
+                    f"{group_name(key)} holds {len(cams)} duplicated cameras, none of "
+                    "which is both aligned and referenced, so its mean error can't be "
+                    "compared with the other groups on this seam. Deduplicate once the "
+                    "chunks are aligned and georeferenced."
+                )
+            scores[key] = {
+                "key": key,
+                "name": group_name(key),
+                "mean_error": sum(errors) / len(errors),
+                "measured": len(errors),
+                "cameras": len(cams),
+            }
+
+        ranked = sorted(scores, key=lambda key: scores[key]["mean_error"])
+
+        for path in seam["paths"]:
+            cams = contested[path]
+            held_by = {}
+            for camera in cams:
+                held_by.setdefault(group_key(camera), []).append(camera)
+            # The seam winner, or the best-ranked group that holds this photo at
+            # all -- only reachable if a seam chains through three groups.
+            keeper = held_by[next(key for key in ranked if key in held_by)][0]
+            duplicates.extend(camera for camera in cams if camera.key != keeper.key)
+
+        report.append({
+            "photos": len(seam["paths"]),
+            "winner": scores[ranked[0]]["name"],
+            "groups": [scores[key] for key in ranked],
+        })
 
     if remove:
         chunk.remove(duplicates)
@@ -428,7 +577,12 @@ def deduplicate_cameras(chunk, remove=False):
         for camera in duplicates:
             camera.enabled = False
 
-    return len(duplicates)
+    return {
+        "count": len(duplicates),
+        "removed": remove,
+        "reset": reset_count,
+        "seams": report,
+    }
 
 
 def build_depth_maps(

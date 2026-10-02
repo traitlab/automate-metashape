@@ -93,6 +93,7 @@ class AddPhotosConfig(BaseModel):
     use_xmp_accuracy: bool = True
     photos_accuracy: float = Field(default=5.0, gt=0)
     load_reference: bool = True
+    import_reference: bool = False
     load_xmp_calibration: bool = True
     load_xmp_orientation: bool = True
     load_xmp_accuracy: bool = True

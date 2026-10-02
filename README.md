@@ -156,7 +156,7 @@ python scripts/run_task.py --project path/to/project.psx \
     --task build_depth_maps --task build_point_cloud
 ```
 
-Chunks that overlap on purpose — so `align_chunks` has cameras in common to work from — leave their shared photos in the merged chunk twice, once per source chunk, because each copy was aligned from tie points the other doesn't have. `deduplicate_cameras` disables all but the first camera holding each photo path ([the script Agisoft give for it](https://www.agisoft.com/forum/index.php?topic=8587.0)); add `--remove-duplicates` to delete them instead of disabling them.
+Chunks that overlap on purpose — so `align_chunks` has cameras in common to work from — leave their shared photos in the merged chunk twice, once per source chunk. `deduplicate_cameras` keeps, for each seam, the source chunk whose duplicated cameras have the lower mean reference error (the Reference pane's `Error (m)`) and disables the repeated photos from the other one, so a seam is served by one chunk rather than by whichever copy came first in camera order. Add `--remove-duplicates` to delete them instead of disabling them, or `--reset-duplicates` to re-enable the copies a previous run disabled and decide again.
 
 The project is saved after each step that changes it, as the pipeline does, so a failure late in a chain doesn't discard the work before it. Pass `--no-save` for a throwaway run.
 
