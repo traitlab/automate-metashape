@@ -599,16 +599,17 @@ class MetashapeWorkflowLefolab:
             ## Get paths to all the project photos
             a = glob.iglob(os.path.join(images_path, "**", "*.*"), recursive=True)
             b = [path for path in a]
+            # Multispectral capture is one RGB .JPG plus one .TIF per band
             if self.cfg["thermal"]:
-                photo_files = [
-                    x for x in b 
-                    if re.search(r"\.tif$", x, re.IGNORECASE)
-                ]
+                photo_pattern = r"\.tif$"
+            elif self.cfg["addPhotos"]["multispectral"]:
+                photo_pattern = r"\.(jpg|tif)$"
             else:
-                photo_files = [
-                    x for x in b 
-                    if re.search(r"\.jpg$", x, re.IGNORECASE)
-                ]
+                photo_pattern = r"\.jpg$"
+            photo_files = [
+                x for x in b
+                if re.search(photo_pattern, x, re.IGNORECASE)
+            ]
 
             if self.cfg["addPhotos"]["multispectral"]:
                 self.doc.chunk.addPhotos(
@@ -668,6 +669,15 @@ class MetashapeWorkflowLefolab:
             sensor.user_calib = calib
             
             sensor.fixed_params=self.cfg["cameracalibration"]["fixed_parameters"]
+
+        # No reflectance panel is used: reflectance comes from the DJI sunlight
+        # sensor irradiance stored in each image's XMP. The RGB .JPG has no
+        # irradiance and is left uncalibrated.
+        if self.cfg["addPhotos"]["multispectral"]:
+            self.doc.chunk.calibrateReflectance(
+                use_reflectance_panels=False,
+                use_sun_sensor=True,
+            )
 
         if not self.cfg["gcps"]:
             self.doc.save()
@@ -1022,31 +1032,46 @@ class MetashapeWorkflowLefolab:
 
         ## Export orthomosaic
         if self.cfg["buildOrthomosaic"]["export"]:
-            if self.cfg["thermal"]:
-                output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_tir" + ".tif"
+            if self.cfg["addPhotos"]["multispectral"]:
+                # Imported here: src.ms_lib.defaults imports this module, so a top-level import would be circular
+                from src.ms_lib.export import export_multispectral_orthomosaic
+
+                export_multispectral_orthomosaic(
+                    self.doc.chunk,
+                    ms_path=os.path.join(self.cfg["output_path"], self.run_id + "_ms.tif"),
+                    rgb_path=os.path.join(self.cfg["output_path"], self.run_id + "_rgb.tif"),
+                    crs=self.cfg["project_crs"],
+                    nodata=self.cfg["buildOrthomosaic"]["nodata"],
+                    tiff_big=self.cfg["buildOrthomosaic"]["tiff_big"],
+                    tiff_tiled=self.cfg["buildOrthomosaic"]["tiff_tiled"],
+                    tiff_overviews=self.cfg["buildOrthomosaic"]["tiff_overviews"],
                 )
             else:
-                output_file = os.path.join(
-                    self.cfg["output_path"], self.run_id + "_rgb" + ".tif"
+                if self.cfg["thermal"]:
+                    output_file = os.path.join(
+                        self.cfg["output_path"], self.run_id + "_tir" + ".tif"
+                    )
+                else:
+                    output_file = os.path.join(
+                        self.cfg["output_path"], self.run_id + "_rgb" + ".tif"
+                    )
+
+                compression = Metashape.ImageCompression()
+                compression.tiff_big = self.cfg["buildOrthomosaic"]["tiff_big"]
+                compression.tiff_tiled = self.cfg["buildOrthomosaic"]["tiff_tiled"]
+                compression.tiff_overviews = self.cfg["buildOrthomosaic"]["tiff_overviews"]
+                compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+
+                projection = Metashape.OrthoProjection()
+                projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
+
+                self.doc.chunk.exportRaster(
+                    path=output_file,
+                    projection=projection,
+                    nodata_value=self.cfg["buildOrthomosaic"]["nodata"],
+                    source_data=Metashape.OrthomosaicData,
+                    image_compression=compression,
                 )
-
-            compression = Metashape.ImageCompression()
-            compression.tiff_big = self.cfg["buildOrthomosaic"]["tiff_big"]
-            compression.tiff_tiled = self.cfg["buildOrthomosaic"]["tiff_tiled"]
-            compression.tiff_overviews = self.cfg["buildOrthomosaic"]["tiff_overviews"]
-            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
-
-            projection = Metashape.OrthoProjection()
-            projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
-
-            self.doc.chunk.exportRaster(
-                path=output_file,
-                projection=projection,
-                nodata_value=self.cfg["buildOrthomosaic"]["nodata"],
-                source_data=Metashape.OrthomosaicData,
-                image_compression=compression,
-            )
 
         if self.cfg["buildOrthomosaic"]["remove_after_export"]:
             self.doc.chunk.remove(self.doc.chunk.orthomosaics)

@@ -80,7 +80,7 @@ def add_photos(
     load_xmp_antenna=None,
     use_xmp_accuracy=None,
     photos_accuracy=None,
-    pattern=r"\.jpg$",
+    pattern=None,
     config_file=None,
 ):
     """Add photos from one or more directories and label cameras by full path.
@@ -91,9 +91,11 @@ def add_photos(
 
     ``images_path`` may be a single directory or a list of directories; each is
     added as its own camera group. ``pattern`` is a case-insensitive regex used
-    to select files (default matches ``.jpg``; use ``r"\\.tif$"`` for thermal
-    TIFFs). When the config's ``use_xmp_accuracy`` is False, every camera's
-    reference accuracy is set to ``photos_accuracy`` (in CRS units).
+    to select files; the default matches ``.jpg``, or ``.jpg`` and ``.tif``
+    together for a multispectral set, whose bands must all be added in one
+    call. Use ``r"\\.tif$"`` for thermal TIFFs. When the config's
+    ``use_xmp_accuracy`` is False, every camera's reference accuracy is set to
+    ``photos_accuracy`` (in CRS units).
     """
     p = step_params(
         "addPhotos",
@@ -108,6 +110,12 @@ def add_photos(
         use_xmp_accuracy=use_xmp_accuracy,
         photos_accuracy=photos_accuracy,
     )
+
+    if pattern is None:
+        # A multispectral capture is one RGB .JPG plus one .TIF per band; all
+        # of them must reach the same addPhotos call for MultiplaneLayout to
+        # group them into one multi-camera frame.
+        pattern = r"\.(jpg|tif)$" if p["multispectral"] else r"\.jpg$"
 
     if isinstance(images_path, str):
         images_path = [images_path]
@@ -141,6 +149,20 @@ def add_photos(
         for camera in chunk.cameras:
             camera.reference.location_accuracy = accuracy
             camera.reference.accuracy = accuracy
+
+
+def calibrate_reflectance(chunk, use_reflectance_panels=False, use_sun_sensor=True):
+    """Calibrate multispectral reflectance, by default from the sunlight sensor only.
+
+    Mirrors the pipeline's multispectral add_photos step: no reflectance panel,
+    irradiance read from each image's DJI XMP. The RGB .JPG of a multi-camera
+    rig has no irradiance and is left uncalibrated. The orthomosaic bakes in the
+    values at build time, so rebuild it after calibrating an existing project.
+    """
+    chunk.calibrateReflectance(
+        use_reflectance_panels=use_reflectance_panels,
+        use_sun_sensor=use_sun_sensor,
+    )
 
 
 def align_photos(

@@ -66,6 +66,81 @@ def export_orthomosaic(
     )
 
 
+def is_multi_camera(chunk):
+    """True when the chunk is a multi-camera rig (several sensor layers, e.g. the M3M RGB + MS bands)."""
+    return len({sensor.layer_index for sensor in chunk.sensors}) > 1
+
+
+def _multi_camera_bands(chunk):
+    """1-based orthomosaic band indices of the RGB sensor and of the single-band (multispectral) sensors.
+
+    Orthomosaic bands follow the sensors in layer order, e.g. M3M: Red, Green, Blue, Green, Red, RedEdge, NIR.
+    """
+    rgb_bands, ms_bands = [], []
+    band_index = 1
+    for sensor in sorted(chunk.sensors, key=lambda s: s.layer_index):
+        indices = list(range(band_index, band_index + len(sensor.bands)))
+        (rgb_bands if len(sensor.bands) == 3 else ms_bands).extend(indices)
+        band_index += len(sensor.bands)
+    return rgb_bands, ms_bands
+
+
+def export_multispectral_orthomosaic(
+    chunk,
+    ms_path,
+    rgb_path,
+    crs,
+    nodata=None,
+    tiff_big=None,
+    tiff_tiled=None,
+    tiff_overviews=None,
+    section="buildOrthomosaic",
+    config_file=None,
+):
+    """Split a multi-camera orthomosaic into two float32 GeoTIFFs through a raster transform.
+
+    - ``ms_path``: the single-band multispectral sensors as reflectance (0-1). Metashape stores
+      calibrated reflectance in uint16 with 1.0 = 32768, so run calibrate_reflectance before
+      building the orthomosaic.
+    - ``rgb_path``: the RGB sensor (8-bit .JPG, stored in the uint16 orthomosaic as 0-65535)
+      brought back to 0-255. It is display color, not reflectance, so it is only rescaled.
+
+    Either path may be None to skip that product.
+    """
+    p = step_params(
+        section,
+        BuildOrthomosaicConfig,
+        config_file=config_file,
+        nodata=nodata,
+        tiff_big=tiff_big,
+        tiff_tiled=tiff_tiled,
+        tiff_overviews=tiff_overviews,
+    )
+
+    rgb_bands, ms_bands = _multi_camera_bands(chunk)
+    exports = [
+        (ms_path, [f"B{i}/32768" for i in ms_bands]),
+        (rgb_path, [f"B{i}/257" for i in rgb_bands]),
+    ]
+
+    raster_transform = chunk.raster_transform
+    raster_transform.enabled = True
+    for path, formula in exports:
+        if path is None or not formula:
+            continue
+        raster_transform.formula = formula
+        chunk.exportRaster(
+            path=path,
+            projection=_projection(crs),
+            nodata_value=p["nodata"],
+            source_data=Metashape.OrthomosaicData,
+            raster_transform=Metashape.RasterTransformValue,
+            image_compression=_image_compression(
+                p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]
+            ),
+        )
+
+
 def export_dem(
     chunk,
     output_path,

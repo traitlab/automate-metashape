@@ -31,11 +31,23 @@ directory, so one run can write every product:
         --output out/
     # -> out/Chunk_1_rgb.tif, out/Chunk_1_dsm.tif, out/Chunk_1_pg.copc.laz
 
+A multispectral rig (e.g. M3M) gets its reflectance from the sunlight sensor with
+calibrate_reflectance. The orthomosaic bakes the values in when it is built, so
+an existing project only needs the orthomosaic rebuilt, not a new alignment;
+export_ortho then writes a 0-1 reflectance <chunk>_ms.tif next to the 0-255
+<chunk>_rgb.tif:
+
+    python scripts/run_task.py \
+        --project path/to/project.psx \
+        --task calibrate_reflectance --task build_orthomosaic --task export_ortho \
+        --output out/
+
 align_chunks and merge_chunks act on a set of chunks rather than one. Name them
 with --chunks (repeat it) or leave it out to take every chunk in the project;
 the rest of the chain then continues on the merged chunk. Chunks that overlap
 leave their shared photos in the merge twice, once per source chunk, so
-deduplicate_cameras disables all but the first camera holding each photo:
+deduplicate_cameras disables, for each seam, every repeated photo on the side
+whose cameras have the higher mean reference error:
 
     python scripts/run_task.py \
         --project path/to/project.psx \
@@ -80,6 +92,10 @@ def task_add_photos(doc, chunk, args):
     require(args, "images")
     process.add_photos(chunk, args.images, multispectral=args.multispectral or None,
                        config_file=args.config_file)
+
+
+def task_calibrate_reflectance(doc, chunk, args):
+    process.calibrate_reflectance(chunk)
 
 
 def task_align(doc, chunk, args):
@@ -165,8 +181,19 @@ def task_build_orthomosaic(doc, chunk, args):
 
 
 def task_export_ortho(doc, chunk, args):
-    export.export_orthomosaic(chunk, output_path(args, chunk, "export_ortho"), args.crs,
-                              config_file=args.config_file)
+    # A multi-camera rig (e.g. M3M RGB + MS bands) is split into a 0-1 reflectance
+    # _ms.tif and a 0-255 _rgb.tif, as main.py does for a multispectral mission.
+    if export.is_multi_camera(chunk):
+        export.export_multispectral_orthomosaic(
+            chunk,
+            ms_path=output_path(args, chunk, "export_ortho", suffix="_ms.tif"),
+            rgb_path=output_path(args, chunk, "export_ortho"),
+            crs=args.crs,
+            config_file=args.config_file,
+        )
+    else:
+        export.export_orthomosaic(chunk, output_path(args, chunk, "export_ortho"), args.crs,
+                                  config_file=args.config_file)
 
 
 def task_export_dem(doc, chunk, args):
@@ -185,6 +212,7 @@ def task_export_report(doc, chunk, args):
 
 TASKS = {
     "add_photos": task_add_photos,
+    "calibrate_reflectance": task_calibrate_reflectance,
     "align": task_align,
     "align_chunks": task_align_chunks,
     "merge_chunks": task_merge_chunks,
@@ -248,11 +276,14 @@ def safe_label(label):
     return cleaned.strip("_") or "chunk"
 
 
-def output_path(args, chunk, task_name):
-    """Path an export task writes to: <--output>/<chunk label><product suffix>."""
+def output_path(args, chunk, task_name, suffix=None):
+    """Path an export task writes to: <--output>/<chunk label><product suffix>.
+
+    ``suffix`` overrides the task's own, for a task that writes several products.
+    """
     require(args, "output")
     os.makedirs(args.output, exist_ok=True)
-    return os.path.join(args.output, safe_label(chunk.label) + EXPORT_SUFFIXES[task_name])
+    return os.path.join(args.output, safe_label(chunk.label) + (suffix or EXPORT_SUFFIXES[task_name]))
 
 
 def parse_args(argv):
