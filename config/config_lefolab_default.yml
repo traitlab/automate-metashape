@@ -87,7 +87,6 @@ gcps: False # Pause processing after photos alignment to allow GCPs to be added 
 # A photo held by two of the merged chunks stays as two cameras in the merged chunk: each was aligned from its own chunk's
 # tie points, which the other copy doesn't have. Run '--task deduplicate_cameras' afterwards to leave one camera per photo.
 alignChunks: # (Metashape: Document.alignChunks)
-    enabled: True
     method: cameras # How to match chunks to each other. Options: points, markers, cameras. "cameras" matches cameras by label, use "points" for chunks that share no cameras, "markers" for GCP-based alignment. Note Metashape's own default is "points".
     fit_scale: True # Allow chunk scale to change during alignment. Set to False for RTK-georeferenced chunks, whose scale is already known.
     downscale: 1 # Alignment accuracy, only used by the "points" method. (0 - Highest, 1 - High, 2 - Medium, 4 - Low, 8 - Lowest)
@@ -97,7 +96,6 @@ alignChunks: # (Metashape: Document.alignChunks)
     keypoint_limit: 60000 # Maximum number of points per photo, only used by the "points" method.
 
 mergeChunks: # (Metashape: Document.mergeChunks)
-    enabled: True
     merge_assets: True # Merge the default assets of the source chunks.
     merge_markers: False # Merge markers (matched by label).
     merge_tiepoints: False # Merge tie points.

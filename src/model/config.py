@@ -144,14 +144,13 @@ class AlignPhotosConfig(BaseModel):
 
 class AlignChunksConfig(BaseModel):
     """Configuration for aligning chunks (Metashape: Document.alignChunks)"""
-    enabled: bool = True
     method: MetashapeChunkAlignmentMethod = MetashapeChunkAlignmentMethod.Cameras
     fit_scale: bool = True
     downscale: int = Field(default=1, ge=0, le=8)
     generic_preselection: bool = False
     filter_mask: bool = False
     mask_tiepoints: bool = False
-    keypoint_limit: int = Field(default=40000, ge=0)
+    keypoint_limit: int = Field(default=60000, ge=0)
 
     @field_validator('downscale')
     @classmethod
@@ -164,18 +163,17 @@ class AlignChunksConfig(BaseModel):
 
 class MergeChunksConfig(BaseModel):
     """Configuration for merging chunks (Metashape: Document.mergeChunks)"""
-    enabled: bool = True
-    merge_assets: bool = False
+    merge_assets: bool = True
     merge_markers: bool = False
     merge_tiepoints: bool = False
     copy_laser_scans: bool = True
     copy_masks: bool = True
-    copy_depth_maps: bool = False
-    copy_point_clouds: bool = False
-    copy_models: bool = False
-    copy_tiled_models: bool = False
-    copy_elevations: bool = False
-    copy_orthomosaics: bool = False
+    copy_depth_maps: bool = True
+    copy_point_clouds: bool = True
+    copy_models: bool = True
+    copy_tiled_models: bool = True
+    copy_elevations: bool = True
+    copy_orthomosaics: bool = True
 
 
 class BuildDepthMapsConfig(BaseModel):
