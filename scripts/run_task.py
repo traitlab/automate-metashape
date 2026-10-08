@@ -98,6 +98,11 @@ def task_calibrate_reflectance(doc, chunk, args):
     process.calibrate_reflectance(chunk)
 
 
+def task_disable_ms_references(doc, chunk, args):
+    count = process.disable_ms_references(chunk)
+    print(f"[run_task] disabled {count} MS band references in '{chunk.label}'")
+
+
 def task_align(doc, chunk, args):
     process.align_photos(chunk, config_file=args.config_file)
 
@@ -213,6 +218,7 @@ def task_export_report(doc, chunk, args):
 TASKS = {
     "add_photos": task_add_photos,
     "calibrate_reflectance": task_calibrate_reflectance,
+    "disable_ms_references": task_disable_ms_references,
     "align": task_align,
     "align_chunks": task_align_chunks,
     "merge_chunks": task_merge_chunks,

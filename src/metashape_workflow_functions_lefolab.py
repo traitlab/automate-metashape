@@ -660,6 +660,13 @@ class MetashapeWorkflowLefolab:
                     ]
                 )
 
+        # Only RGB references are used for georeferencing; MS band ones (EXIF) just skew reported errors
+        if self.cfg["addPhotos"]["multispectral"]:
+            for cam in self.doc.chunk.cameras:
+                if cam.master is not None and cam.master != cam:
+                    cam.reference.location_enabled = False
+                    cam.reference.rotation_enabled = False
+
         if self.cfg["camera_calibration_path"] != "":
             sensor = self.doc.chunk.sensors[0]
             calib = Metashape.Calibration()

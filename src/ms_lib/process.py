@@ -150,6 +150,24 @@ def add_photos(
             camera.reference.location_accuracy = accuracy
             camera.reference.accuracy = accuracy
 
+    if p["multispectral"]:
+        disable_ms_references(chunk)
+
+
+def disable_ms_references(chunk):
+    """Disable the MS band references, keeping the RGB ones; returns the count.
+
+    Only the RGB references are used for georeferencing; the MS band ones (EXIF)
+    just skew the report's camera errors.
+    """
+    count = 0
+    for camera in chunk.cameras:
+        if camera.master is not None and camera.master != camera:
+            camera.reference.location_enabled = False
+            camera.reference.rotation_enabled = False
+            count += 1
+    return count
+
 
 def calibrate_reflectance(chunk, use_reflectance_panels=False, use_sun_sensor=True):
     """Calibrate multispectral reflectance, by default from the sunlight sensor only.
