@@ -702,19 +702,25 @@ def build_dem(
     chunk,
     crs,
     resolution=None,
-    source_data=Metashape.PointCloudData,
+    source_data=None,
     subdivide_task=None,
     label="DSM",
     section="buildDem",
     config_file=None,
 ):
-    """Build a DEM from the point cloud, projected into ``crs``.
+    """Build a DEM from the point cloud (or tie points), projected into ``crs``.
 
     ``crs`` is a required "EPSG::<code>" string -- see io.derive_project_crs for
     why falling back to chunk.crs would be wrong. The resulting elevation is
     tagged with ``label`` (default "DSM") so build_orthomosaic can find it.
     """
-    p = step_params(section, BuildDemConfig, config_file=config_file, resolution=resolution)
+    p = step_params(
+        section,
+        BuildDemConfig,
+        config_file=config_file,
+        resolution=resolution,
+        source_data=source_data,
+    )
     if subdivide_task is None:
         subdivide_task = global_param("subdivide_task", True, config_file)
 
@@ -722,7 +728,7 @@ def build_dem(
     projection.crs = Metashape.CoordinateSystem(crs)
 
     chunk.buildDem(
-        source_data=source_data,
+        source_data=p["source_data"],
         subdivide_task=subdivide_task,
         projection=projection,
         resolution=p["resolution"],

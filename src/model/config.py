@@ -33,6 +33,12 @@ class MetashapeReferencePreselectionMode(str, Enum):
     Sequential = "Metashape.ReferencePreselectionSequential"
 
 
+class MetashapeDemSource(str, Enum):
+    """Data a DEM can be built from"""
+    PointCloud = "Metashape.PointCloudData"
+    TiePoints = "Metashape.TiePointsData"
+
+
 class MetashapeChunkAlignmentMethod(str, Enum):
     """Chunk alignment methods.
 
@@ -226,6 +232,7 @@ class BuildDemConfig(BaseModel):
     """Configuration for building DEM"""
     enabled: bool = True
     classify_ground_points: bool = False
+    source_data: MetashapeDemSource = MetashapeDemSource.PointCloud
     resolution: float = Field(default=0.0, ge=0)
     export: bool = True
     tiff_big: bool = True

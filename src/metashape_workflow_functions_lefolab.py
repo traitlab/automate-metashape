@@ -874,7 +874,7 @@ class MetashapeWorkflowLefolab:
 
             # call without point classes argument (Metashape then defaults to all classes)
             self.doc.chunk.buildDem(
-                source_data=Metashape.PointCloudData,
+                source_data=self.cfg["buildDem"]["source_data"],
                 subdivide_task=self.cfg["subdivide_task"],
                 projection=projection,
                 resolution=self.cfg["buildDem"]["resolution"],
