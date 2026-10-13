@@ -456,4 +456,6 @@ def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple
     
     # Validate and return both the Pydantic model and the dict
     validated_config = MetashapeConfig(**config_dict)
-    return validated_config, config_dict
+    cfg = validated_config.model_dump(mode="json")
+    cfg["config_file"] = config_file  # keep it in the run log
+    return validated_config, cfg
