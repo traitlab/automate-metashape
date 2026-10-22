@@ -1,7 +1,8 @@
 """Export helpers for common Metashape output products.
 
-Raster exports use Deflate-compressed, tiled, overview-carrying (Big)TIFFs and an
-explicit projection; point clouds are exported as COPC LAZ. The nodata value and
+Raster exports use LZW-compressed, tiled, overview-carrying (Big)TIFFs and an explicit
+projection (export_cogs then writes Deflate-compressed COG copies); point clouds are
+exported as COPC LAZ. The nodata value and
 the TIFF flags come from the same config block as the corresponding build step
 ("buildDem" for the DEM, "buildOrthomosaic" for the ortho), which is how the
 pipeline pairs them too.
@@ -23,12 +24,12 @@ from src.ms_lib.defaults import global_param, step_params
 
 
 def _image_compression(tiff_big, tiff_tiled, tiff_overviews):
-    """Build the standard TIFF compression settings (Deflate)."""
+    """Build the standard TIFF compression settings (LZW)."""
     compression = Metashape.ImageCompression()
     compression.tiff_big = tiff_big
     compression.tiff_tiled = tiff_tiled
     compression.tiff_overviews = tiff_overviews
-    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
     return compression
 
 

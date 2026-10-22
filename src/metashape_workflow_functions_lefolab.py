@@ -946,7 +946,7 @@ class MetashapeWorkflowLefolab:
             compression.tiff_big = self.cfg["buildDem"]["tiff_big"]
             compression.tiff_tiled = self.cfg["buildDem"]["tiff_tiled"]
             compression.tiff_overviews = self.cfg["buildDem"]["tiff_overviews"]
-            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
 
             start_time = time.time()
 
@@ -1140,7 +1140,7 @@ class MetashapeWorkflowLefolab:
                 compression.tiff_big = self.cfg["buildOrthomosaic"]["tiff_big"]
                 compression.tiff_tiled = self.cfg["buildOrthomosaic"]["tiff_tiled"]
                 compression.tiff_overviews = self.cfg["buildOrthomosaic"]["tiff_overviews"]
-                compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+                compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
 
                 projection = Metashape.OrthoProjection()
                 projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
@@ -1255,7 +1255,7 @@ class MetashapeWorkflowLefolab:
         compression.tiff_big = self.cfg["buildDemHighDis"]["tiff_big"]
         compression.tiff_tiled = self.cfg["buildDemHighDis"]["tiff_tiled"]
         compression.tiff_overviews = self.cfg["buildDemHighDis"]["tiff_overviews"]
-        compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+        compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
 
         # call without point classes argument (Metashape then defaults to all classes)
         self.doc.chunk.buildDem(
