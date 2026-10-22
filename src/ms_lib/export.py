@@ -144,6 +144,31 @@ def _gdal_finalize(src, dst, names, to_8bit, tiff_big, tiff_tiled, tiff_overview
     os.remove(src)
 
 
+def export_cogs(output_path, run_id, suffixes=("_dsm", "_rgb", "_tir", "_ms")):
+    """Write a Cloud Optimized GeoTIFF ``<run_id><suffix>.cog.tif`` next to each exported raster.
+
+    The original ``.tif`` files are kept; suffixes without an exported raster are skipped. The COG
+    driver's PREDICTOR=YES picks the floating-point predictor (3) for float rasters such as the DSM
+    and the horizontal one (2) for integer rasters such as the RGB.
+    """
+    if shutil.which("gdal_translate") is None:
+        print("[export] GDAL command-line tools not found: skipping COG conversion")
+        return
+    for suffix in suffixes:
+        src = os.path.join(output_path, run_id + suffix + ".tif")
+        if not os.path.exists(src):
+            continue
+        dst = os.path.join(output_path, run_id + suffix + ".cog.tif")
+        print(f"[export] Writing {dst}")
+        _gdal(
+            "gdal_translate", "-q", "-of", "COG",
+            "-co", "COMPRESS=DEFLATE", "-co", "PREDICTOR=YES", "-co", "LEVEL=9",
+            "-co", "BIGTIFF=IF_SAFER", "-co", "BLOCKSIZE=128", "-co", "OVERVIEWS=AUTO",
+            "-co", "NUM_THREADS=8",
+            src, dst,
+        )  # fmt: skip
+
+
 def export_multispectral_orthomosaic(
     chunk,
     ms_path,

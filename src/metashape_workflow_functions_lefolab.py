@@ -156,6 +156,8 @@ class MetashapeWorkflowLefolab:
 
             self.export_report()
 
+            self.export_cogs()
+
             self.finish_run()
         finally:
             self._release_mission_lock()
@@ -1394,6 +1396,17 @@ class MetashapeWorkflowLefolab:
         output_file = os.path.join(self.cfg["output_path"], self.run_id + "_report.pdf")
 
         self.doc.chunk.exportReport(path=output_file)
+
+        return True
+
+    def export_cogs(self):
+        """
+        Convert the exported DSM and orthomosaic(s) to Cloud Optimized GeoTIFFs, keeping the originals
+        """
+        # Imported here: src.ms_lib.defaults imports this module, so a top-level import would be circular
+        from src.ms_lib.export import export_cogs
+
+        export_cogs(self.cfg["output_path"], self.run_id)
 
         return True
 
