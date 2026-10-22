@@ -61,10 +61,10 @@ python main.py -i /path/to/photos/20261006_site_m3e --quick-process
 | `-c`, `--config-file` | YAML config (default: `config/config_lefolab_default.yml`) |
 | `-p`, `--project-path` | Folder for the `.psx` project and log |
 | `-o`, `--output-path` | Folder for exports (default: `<project_path>/metashape/`) |
-| `-id`, `--mission-id` | `<yyyymmdd>_<site>_<optional>_<sensor>`; default: photo folder name |
+| `--mission-id` | `<yyyymmdd>_<site>_<optional>_<sensor>`; default: photo folder name |
 | `--input-crs` | CRS of the photo coordinates (default: `EPSG::4326`) |
-| `-crs`, `--project-crs` | Output CRS, e.g. `EPSG::32618` (default: UTM zone from the photos) |
-| `-cam`, `--camera-calibration-path` | Camera calibration `.xml` (examples in `calibration/`) |
+| `--project-crs` | Output CRS, e.g. `EPSG::32618` (default: UTM zone from the photos) |
+| `--camera-calibration-path` | Camera calibration `.xml` (examples in `calibration/`) |
 | `-l`, `--load-project` | Existing `.psx` to continue from |
 | `-g`, `--gcps` | Pause after alignment to add GCPs in the GUI |
 | `-q`, `--quick-process` | Skip the HighDis pass |

@@ -362,7 +362,6 @@ def parse_args(argv):
         "<chunk><product suffix>. Created if missing.",
     )
     parser.add_argument(
-        "-crs",
         "--crs",
         help="Projected CRS ('EPSG::<code>') for DEM/ortho/point-cloud build & export.\n"
         "If omitted, derived as the UTM zone of the median camera position, the same\n"

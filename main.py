@@ -41,7 +41,6 @@ def parse_args():
         + "If not provided, default is '<project_path>/metashape/'.",
     )
     parser.add_argument(
-        "-id",
         "--mission-id",
         help="The identifier for the run. Will be used in naming output files.\n"
         + "It should be in the format: '<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>'.\n"
@@ -54,14 +53,12 @@ def parse_args():
         + "To change in rare cases where RTK or NTRIP provider used a different datum.",
     )
     parser.add_argument(
-        "-crs",
         "--project-crs",
         help="CRS EPSG code that project outputs should be in.\n"
         + "It should be in the format: 'EPSG::<EPSG code>'.\n"
         + "If not provided, it will be calculated from the median coordinates of the images (using UTM).",
     )
     parser.add_argument(
-        "-cam",
         "--camera-calibration-path",
         help="Path to a camera calibration file (.xml).",
     )
