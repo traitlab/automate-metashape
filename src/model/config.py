@@ -6,7 +6,7 @@ import re
 from enum import Enum
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class MetashapeFiltering(str, Enum):
@@ -316,6 +316,9 @@ class ThermalParametersConfig(BaseModel):
 class MetashapeConfig(BaseModel):
     """Main configuration model for Metashape workflow"""
 
+    # Use enum values instead of names
+    model_config = ConfigDict(use_enum_values=True)
+
     # Project parameters
     images_path: Union[str, List[str]] = ""
     output_path: str = ""
@@ -398,10 +401,6 @@ class MetashapeConfig(BaseModel):
         if self.addPhotos.enabled and not self.images_path:
             raise ValueError("images_path must be set when addPhotos is enabled")
         return self
-
-    class Config:
-        # Use enum values instead of names
-        use_enum_values = True
 
 
 def load_config(
