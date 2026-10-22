@@ -90,8 +90,9 @@ from src.ms_lib.io import (  # noqa: E402
 
 def task_add_photos(doc, chunk, args):
     require(args, "images")
-    process.add_photos(chunk, args.images, multispectral=args.multispectral or None,
-                       config_file=args.config_file)
+    process.add_photos(
+        chunk, args.images, multispectral=args.multispectral or None, config_file=args.config_file
+    )
 
 
 def task_calibrate_reflectance(doc, chunk, args):
@@ -117,30 +118,33 @@ def task_align_chunks(doc, chunk, args):
 def task_merge_chunks(doc, chunk, args):
     chunks = resolve_chunks(doc, args.chunks)
     print("[run_task] merging chunks: " + ", ".join(repr(c.label) for c in chunks))
-    merged = process.merge_chunks(doc, chunks, label=args.merged_label,
-                                  config_file=args.config_file)
-    print(f"[run_task] merged into new chunk '{merged.label}' "
-          f"({len(merged.cameras)} cameras)")
+    merged = process.merge_chunks(
+        doc, chunks, label=args.merged_label, config_file=args.config_file
+    )
+    print(f"[run_task] merged into new chunk '{merged.label}' ({len(merged.cameras)} cameras)")
     # Later steps in the chain build on the merge result, not on --chunk.
     return merged
 
 
 def task_deduplicate_cameras(doc, chunk, args):
-    report = process.deduplicate_cameras(chunk, remove=args.remove_duplicates,
-                                         reset=args.reset_duplicates)
+    report = process.deduplicate_cameras(
+        chunk, remove=args.remove_duplicates, reset=args.reset_duplicates
+    )
     verb = "removed" if report["removed"] else "disabled"
     if report["reset"]:
-        print(f"[run_task] re-enabled {report['reset']} duplicate cameras a previous "
-              "run had disabled")
+        print(
+            f"[run_task] re-enabled {report['reset']} duplicate cameras a previous run had disabled"
+        )
     # One block per seam: what the losing side cost, so the choice is checkable
     # against the Reference pane.
     for seam in report["seams"]:
-        print(f"[run_task] seam of {seam['photos']} photos held by "
-              f"{len(seam['groups'])} groups:")
+        print(f"[run_task] seam of {seam['photos']} photos held by {len(seam['groups'])} groups:")
         for group in seam["groups"]:
-            print(f"[run_task]   {group['name']}: mean error "
-                  f"{group['mean_error']:.3f} m over {group['measured']} of "
-                  f"{group['cameras']} duplicated cameras")
+            print(
+                f"[run_task]   {group['name']}: mean error "
+                f"{group['mean_error']:.3f} m over {group['measured']} of "
+                f"{group['cameras']} duplicated cameras"
+            )
         print(f"[run_task]   keeping {seam['winner']}")
     print(f"[run_task] {verb} {report['count']} duplicate cameras in '{chunk.label}'")
 
@@ -154,8 +158,7 @@ def task_build_depth_maps(doc, chunk, args):
 
 
 def task_build_depth_maps_highdis(doc, chunk, args):
-    process.build_depth_maps(chunk, section="buildDepthMapsHighDis",
-                             config_file=args.config_file)
+    process.build_depth_maps(chunk, section="buildDepthMapsHighDis", config_file=args.config_file)
 
 
 def task_build_point_cloud(doc, chunk, args):
@@ -163,8 +166,7 @@ def task_build_point_cloud(doc, chunk, args):
 
 
 def task_build_point_cloud_highdis(doc, chunk, args):
-    process.build_point_cloud(chunk, section="buildPointCloudHighDis",
-                              config_file=args.config_file)
+    process.build_point_cloud(chunk, section="buildPointCloudHighDis", config_file=args.config_file)
 
 
 def task_build_model(doc, chunk, args):
@@ -172,13 +174,17 @@ def task_build_model(doc, chunk, args):
 
 
 def task_build_dem(doc, chunk, args):
-    process.build_dem(chunk, args.crs, resolution=args.resolution,
-                      config_file=args.config_file)
+    process.build_dem(chunk, args.crs, resolution=args.resolution, config_file=args.config_file)
 
 
 def task_build_dem_highdis(doc, chunk, args):
-    process.build_dem(chunk, args.crs, resolution=args.resolution,
-                      section="buildDemHighDis", config_file=args.config_file)
+    process.build_dem(
+        chunk,
+        args.crs,
+        resolution=args.resolution,
+        section="buildDemHighDis",
+        config_file=args.config_file,
+    )
 
 
 def task_build_orthomosaic(doc, chunk, args):
@@ -197,18 +203,24 @@ def task_export_ortho(doc, chunk, args):
             config_file=args.config_file,
         )
     else:
-        export.export_orthomosaic(chunk, output_path(args, chunk, "export_ortho"), args.crs,
-                                  config_file=args.config_file)
+        export.export_orthomosaic(
+            chunk, output_path(args, chunk, "export_ortho"), args.crs, config_file=args.config_file
+        )
 
 
 def task_export_dem(doc, chunk, args):
-    export.export_dem(chunk, output_path(args, chunk, "export_dem"), args.crs,
-                      config_file=args.config_file)
+    export.export_dem(
+        chunk, output_path(args, chunk, "export_dem"), args.crs, config_file=args.config_file
+    )
 
 
 def task_export_point_cloud(doc, chunk, args):
-    export.export_point_cloud(chunk, output_path(args, chunk, "export_point_cloud"),
-                              args.crs, config_file=args.config_file)
+    export.export_point_cloud(
+        chunk,
+        output_path(args, chunk, "export_point_cloud"),
+        args.crs,
+        config_file=args.config_file,
+    )
 
 
 def task_export_report(doc, chunk, args):
@@ -289,7 +301,9 @@ def output_path(args, chunk, task_name, suffix=None):
     """
     require(args, "output")
     os.makedirs(args.output, exist_ok=True)
-    return os.path.join(args.output, safe_label(chunk.label) + (suffix or EXPORT_SUFFIXES[task_name]))
+    return os.path.join(
+        args.output, safe_label(chunk.label) + (suffix or EXPORT_SUFFIXES[task_name])
+    )
 
 
 def parse_args(argv):
@@ -374,7 +388,9 @@ def parse_args(argv):
         "--no-cuda", action="store_true", help="Use OpenCL instead of CUDA for GPU steps"
     )
     parser.add_argument(
-        "--gpu-multiplier", type=int, default=None,
+        "--gpu-multiplier",
+        type=int,
+        default=None,
         help="Metashape depth_max_gpu_multiplier tweak",
     )
     parser.add_argument(

@@ -65,9 +65,7 @@ def export_orthomosaic(
         projection=_projection(crs),
         nodata_value=p["nodata"],
         source_data=Metashape.OrthomosaicData,
-        image_compression=_image_compression(
-            p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]
-        ),
+        image_compression=_image_compression(p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]),
     )
 
 
@@ -117,8 +115,22 @@ def _gdal_finalize(src, dst, names, to_8bit, tiff_big, tiff_tiled, tiff_overview
         creation += ["-co", "TILED=YES"]
     if to_8bit:
         # -b mask turns the nodata pixels into the alpha band; uint8 can't hold the -32767 nodata value
-        bands = ["-ot", "Byte", "-b", "1", "-b", "2", "-b", "3", "-b", "mask",
-                 "-colorinterp", "red,green,blue,alpha", "-a_nodata", "none"]
+        bands = [
+            "-ot",
+            "Byte",
+            "-b",
+            "1",
+            "-b",
+            "2",
+            "-b",
+            "3",
+            "-b",
+            "mask",
+            "-colorinterp",
+            "red,green,blue,alpha",
+            "-a_nodata",
+            "none",
+        ]
         creation += ["-co", "PREDICTOR=2", "-co", "ALPHA=YES"]
     else:
         bands = []
@@ -199,8 +211,15 @@ def export_multispectral_orthomosaic(
             ),
         )
         if use_gdal:
-            _gdal_finalize(export_path, path, [name for _, name in bands], to_8bit,
-                           p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"])
+            _gdal_finalize(
+                export_path,
+                path,
+                [name for _, name in bands],
+                to_8bit,
+                p["tiff_big"],
+                p["tiff_tiled"],
+                p["tiff_overviews"],
+            )
 
 
 def export_dem(
@@ -230,9 +249,7 @@ def export_dem(
         projection=_projection(crs),
         nodata_value=p["nodata"],
         source_data=Metashape.ElevationData,
-        image_compression=_image_compression(
-            p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]
-        ),
+        image_compression=_image_compression(p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]),
     )
 
 

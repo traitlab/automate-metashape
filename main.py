@@ -5,6 +5,7 @@ import argparse
 import os
 import re
 from argparse import RawTextHelpFormatter
+
 from src.metashape_workflow_functions_lefolab import MetashapeWorkflowLefolab
 from src.model.config import load_config
 
@@ -13,6 +14,7 @@ from src.model.config import load_config
 # Define where to get the config file
 script_dir = os.path.dirname(os.path.abspath(__file__))
 default_config_file = os.path.join(script_dir, "config", "config_lefolab_default.yml")
+
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
@@ -115,6 +117,7 @@ def parse_args():
 
     return args
 
+
 args = parse_args()
 
 # Check if required parameters are provided or appropriate config file is used
@@ -141,12 +144,11 @@ try:
     #         config_file=args.config_file,
     #         override_dict=None
     #     )
-    
+
     # Always apply CLI overrides
     validated_config, config_dict = load_config(
-        config_file=args.config_file,
-        override_dict=args.__dict__
-        )
+        config_file=args.config_file, override_dict=args.__dict__
+    )
 except Exception as e:
     print(f"\nConfiguration validation failed: {e}\n")
     raise
