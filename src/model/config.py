@@ -307,7 +307,9 @@ class ThermalParametersConfig(BaseModel):
             try:
                 datetime.datetime.strptime(v, "%Y-%m-%d %H:%M:%S")
             except ValueError:
-                raise ValueError(f"Datetime must be in format 'YYYY-MM-DD HH:MM:SS', got: {v}")
+                raise ValueError(
+                    f"Datetime must be in format 'YYYY-MM-DD HH:MM:SS', got: {v}"
+                ) from None
         return v
 
 
@@ -487,7 +489,7 @@ def load_config(
             raise ValueError(
                 f"Failed to calculate project_crs from photos: {e}\n"
                 "Please specify project_crs manually in the config file or as a CLI argument."
-            )
+            ) from e
 
     # Validate and return both the Pydantic model and the dict
     validated_config = MetashapeConfig(**config_dict)

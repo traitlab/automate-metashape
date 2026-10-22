@@ -106,7 +106,7 @@ def _gdal_finalize(src, dst, names, to_8bit, tiff_big, tiff_tiled, tiff_overview
     vrt = dst + ".tmp.vrt"
     _gdal("gdal_translate", "-q", "-of", "VRT", src, vrt)
     tree = ET.parse(vrt)
-    for band, name in zip(tree.getroot().iter("VRTRasterBand"), names):
+    for band, name in zip(tree.getroot().iter("VRTRasterBand"), names, strict=True):
         ET.SubElement(band, "Description").text = name
     tree.write(vrt)
 

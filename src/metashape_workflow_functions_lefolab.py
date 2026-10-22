@@ -197,7 +197,7 @@ class MetashapeWorkflowLefolab:
                     f" (node: {node}, PID: {pid}, lock file: {self.mission_lock_file})."
                     " If that process was killed, verify with 'ps -p <pid>' on that node,"
                     " then delete the lock file and relaunch."
-                )
+                ) from None
         raise RuntimeError(f"Could not acquire mission lock: {self.mission_lock_file}")
 
     def _read_mission_lock(self):
@@ -305,7 +305,7 @@ class MetashapeWorkflowLefolab:
                     f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}. "
                     "Another run may have claimed it first. "
                     "Please retry in a minute or use --load-project to open the existing project."
-                )
+                ) from None
 
         """
         Create a doc and a chunk
@@ -395,7 +395,7 @@ class MetashapeWorkflowLefolab:
                                 MetashapeWorkflowLefolab.sep.join(["CPU Model", cpu_model]) + "\n"
                             )
                             break
-            except:
+            except Exception:
                 file.write(
                     MetashapeWorkflowLefolab.sep.join(["CPU Model", platform.processor()]) + "\n"
                 )
@@ -411,7 +411,7 @@ class MetashapeWorkflowLefolab:
                                 + "\n"
                             )
                             break
-            except:
+            except Exception:
                 file.write(
                     MetashapeWorkflowLefolab.sep.join(["Total RAM", "Unable to determine"]) + "\n"
                 )
@@ -431,7 +431,7 @@ class MetashapeWorkflowLefolab:
                                 + "\n"
                             )
                             break
-            except:
+            except Exception:
                 pass
             file.write(
                 MetashapeWorkflowLefolab.sep.join(["Python Version", platform.python_version()])
@@ -583,7 +583,7 @@ class MetashapeWorkflowLefolab:
                         )
 
             except Exception as e:
-                raise ValueError(f"Could not extract weather data\n  {e}")
+                raise ValueError(f"Could not extract weather data\n  {e}") from e
 
         # Process each images path
         for images_path in images_paths:
@@ -718,7 +718,7 @@ class MetashapeWorkflowLefolab:
                 )
 
         # If specified, change the accuracy of the cameras for custom value
-        if self.cfg["addPhotos"]["use_xmp_accuracy"] == False:
+        if not self.cfg["addPhotos"]["use_xmp_accuracy"]:
             for cam in self.doc.chunk.cameras:
                 cam.reference.location_accuracy = Metashape.Vector(
                     [
