@@ -131,3 +131,6 @@ dev/
 **/.vscode/
 *.pdf
 /test
+
+# Reference files
+/docs/reference/

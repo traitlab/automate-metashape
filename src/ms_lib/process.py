@@ -605,11 +605,13 @@ def deduplicate_cameras(chunk, remove=False, reset=False):
             keeper = held_by[next(key for key in ranked if key in held_by)][0]
             duplicates.extend(camera for camera in cams if camera.key != keeper.key)
 
-        report.append({
-            "photos": len(seam["paths"]),
-            "winner": scores[ranked[0]]["name"],
-            "groups": [scores[key] for key in ranked],
-        })
+        report.append(
+            {
+                "photos": len(seam["paths"]),
+                "winner": scores[ranked[0]]["name"],
+                "groups": [scores[key] for key in ranked],
+            }
+        )
 
     if remove:
         chunk.remove(duplicates)
