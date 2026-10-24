@@ -9,29 +9,31 @@ import signal
 import subprocess
 import sys
 import time
-import yaml
 
 import Metashape
-from src.utilis import get_start_end_datetime_filename, load_weather_data, extract_weather_mean
+import yaml
+
+from src.utilis import extract_weather_mean, get_start_end_datetime_filename, load_weather_data
 
 
 def resolve_metashape_object(name):
     """
-    Resolve a dotted Metashape object name (e.g., "Metashape.MosaicBlending") 
+    Resolve a dotted Metashape object name (e.g., "Metashape.MosaicBlending")
     into the actual Metashape object.
     """
     if not name.startswith("Metashape."):
         raise ValueError(f"Invalid Metashape object name: {name}")
-    
+
     parts = name.split(".")[1:]
     obj = Metashape
     for part in parts:
         obj = getattr(obj, part)
     return obj
 
+
 def convert_objects(a_dict):
     """
-    Convert strings that refer to metashape objects (e.g. "Metashape.MosaicBlending") 
+    Convert strings that refer to metashape objects (e.g. "Metashape.MosaicBlending")
     into metashape objects.
     """
     for k, v in a_dict.items():
@@ -43,9 +45,14 @@ def convert_objects(a_dict):
             elif isinstance(v, list):
                 # Convert list items that contain "Metashape"
                 if any("Metashape" in item for item in v if isinstance(item, str)):
-                    a_dict[k] = [resolve_metashape_object(item) for item in v if isinstance(item, str) and "Metashape" in item]
+                    a_dict[k] = [
+                        resolve_metashape_object(item)
+                        for item in v
+                        if isinstance(item, str) and "Metashape" in item
+                    ]
         else:
             convert_objects(v)
+
 
 def stamp_time():
     """
@@ -53,6 +60,7 @@ def stamp_time():
     """
     stamp = datetime.datetime.now().strftime("%Y-%m-%dT%H%M")
     return stamp
+
 
 def diff_time(t2, t1):
     """
@@ -62,7 +70,7 @@ def diff_time(t2, t1):
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
     seconds = total_seconds % 60
-    
+
     # Format based on value
     if hours > 0:
         return f"{hours}h{minutes:02d}m{seconds:02d}s"
@@ -81,8 +89,10 @@ class MetashapeWorkflowLefolab:
     ):
         """
         Initializes an instance of the MetashapeWorkflowLefolab class based on the config file given
-        """       
-        self.config_file = copy.deepcopy(config_file) # Store config for logging (before conversion to Metashape objects)
+        """
+        self.config_file = copy.deepcopy(
+            config_file
+        )  # Store config for logging (before conversion to Metashape objects)
         self.cfg = config_file
         self.doc = None
         self.log_file = None
@@ -146,6 +156,8 @@ class MetashapeWorkflowLefolab:
 
             self.export_report()
 
+            self.export_cogs()
+
             self.finish_run()
         finally:
             self._release_mission_lock()
@@ -157,20 +169,26 @@ class MetashapeWorkflowLefolab:
         removed automatically if it was created on this node and its PID is dead;
         a lock from another node must be verified and removed manually.
         """
-        self.mission_lock_file = os.path.join(self.cfg["project_path"], self.cfg["mission_id"] + ".lock")
+        self.mission_lock_file = os.path.join(
+            self.cfg["project_path"], self.cfg["mission_id"] + ".lock"
+        )
         self._mission_lock_acquired = False
 
         for _ in range(2):
             try:
                 fd = os.open(self.mission_lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
                 with os.fdopen(fd, "w") as file:
-                    file.write(f"node: {platform.node()}\npid: {os.getpid()}\nstarted: {stamp_time()}\n")
+                    file.write(
+                        f"node: {platform.node()}\npid: {os.getpid()}\nstarted: {stamp_time()}\n"
+                    )
                 self._mission_lock_acquired = True
                 return
             except FileExistsError:
                 node, pid = self._read_mission_lock()
                 if node == platform.node() and pid is not None and not self._pid_is_alive(pid):
-                    print(f"[INFO] Removing stale mission lock left by dead PID {pid} on this node.")
+                    print(
+                        f"[INFO] Removing stale mission lock left by dead PID {pid} on this node."
+                    )
                     try:
                         os.remove(self.mission_lock_file)
                     except FileNotFoundError:
@@ -181,7 +199,7 @@ class MetashapeWorkflowLefolab:
                     f" (node: {node}, PID: {pid}, lock file: {self.mission_lock_file})."
                     " If that process was killed, verify with 'ps -p <pid>' on that node,"
                     " then delete the lock file and relaunch."
-                )
+                ) from None
         raise RuntimeError(f"Could not acquire mission lock: {self.mission_lock_file}")
 
     def _read_mission_lock(self):
@@ -270,8 +288,12 @@ class MetashapeWorkflowLefolab:
         self.run_id = mission_id
         self.run_id_with_time = "_".join([mission_id, timestamp])
 
-        self.project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
-        self.log_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"]))
+        self.project_file = os.path.join(
+            self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"])
+        )
+        self.log_file = os.path.join(
+            self.cfg["project_path"], ".".join([self.run_id_with_time + "_log", "txt"])
+        )
 
         if not self.cfg["load_project"]:
             # Claim the project file atomically (O_EXCL) so two runs started in the
@@ -285,13 +307,15 @@ class MetashapeWorkflowLefolab:
                     f"Project with similar timestamp ({timestamp}) already exists at {self.project_file.replace('/mnt/nfs/', '')}. "
                     "Another run may have claimed it first. "
                     "Please retry in a minute or use --load-project to open the existing project."
-                )
+                ) from None
 
         """
         Create a doc and a chunk
         """
         # Create a handle to the Metashape object
-        self.doc = (Metashape.Document())  # When running via Metashape GUI, use: doc = Metashape.app.document
+        self.doc = (
+            Metashape.Document()
+        )  # When running via Metashape GUI, use: doc = Metashape.app.document
 
         # If specified, open existing project
         if self.cfg["load_project"] != "":
@@ -307,9 +331,13 @@ class MetashapeWorkflowLefolab:
             else:
                 # Raise error if the project does not have a chunk, or has multiple chunks
                 if len(self.doc.chunks) == 0:
-                    raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks.")
+                    raise ValueError(
+                        f"Project {os.path.basename(self.cfg['load_project'])} does not contain any chunks."
+                    )
                 if len(self.doc.chunks) > 1:
-                    raise ValueError(f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk.")
+                    raise ValueError(
+                        f"Project {os.path.basename(self.cfg['load_project'])} contains multiple chunks. This workflow only supports projects with a single chunk."
+                    )
 
                 # If cameras are already present, make sure they exist and their paths are identical to their labels
                 if self.doc.chunk.cameras:
@@ -320,8 +348,10 @@ class MetashapeWorkflowLefolab:
                             if os.path.exists(camera.label):
                                 camera.photo.path = camera.label
                             else:
-                                raise FileNotFoundError(f"Photo path for camera '{camera.label}' does not exist: {photo_path}")
-                            
+                                raise FileNotFoundError(
+                                    f"Photo path for camera '{camera.label}' does not exist: {photo_path}"
+                                )
+
                 # If markers exist, set after_gcps to True
                 if self.doc.chunk.markers:
                     self.after_gcps = True
@@ -347,42 +377,68 @@ class MetashapeWorkflowLefolab:
         Log specs except for GPU
         """
         with open(self.log_file, "a") as file:
-
             file.write(MetashapeWorkflowLefolab.sep.join(["Project", self.run_id]) + "\n")
-            file.write(MetashapeWorkflowLefolab.sep.join(["Agisoft Metashape Professional Version", Metashape.app.version]) + "\n")
-            file.write(MetashapeWorkflowLefolab.sep.join(["Processing started", stamp_time()]) + "\n")
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(
+                    ["Agisoft Metashape Professional Version", Metashape.app.version]
+                )
+                + "\n"
+            )
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["Processing started", stamp_time()]) + "\n"
+            )
             file.write(MetashapeWorkflowLefolab.sep.join(["Node", platform.node()]) + "\n")
             try:
-                with open('/proc/cpuinfo', 'r') as cpuinfo:
+                with open("/proc/cpuinfo", "r") as cpuinfo:
                     for line in cpuinfo:
-                        if 'model name' in line:
-                            cpu_model = line.split(':')[1].strip()
-                            file.write(MetashapeWorkflowLefolab.sep.join(["CPU Model", cpu_model]) + "\n")
+                        if "model name" in line:
+                            cpu_model = line.split(":")[1].strip()
+                            file.write(
+                                MetashapeWorkflowLefolab.sep.join(["CPU Model", cpu_model]) + "\n"
+                            )
                             break
-            except:
-                file.write(MetashapeWorkflowLefolab.sep.join(["CPU Model", platform.processor()]) + "\n")
+            except Exception:
+                file.write(
+                    MetashapeWorkflowLefolab.sep.join(["CPU Model", platform.processor()]) + "\n"
+                )
             file.write(MetashapeWorkflowLefolab.sep.join(["CPU Cores", str(os.cpu_count())]) + "\n")
             try:
-                with open('/proc/meminfo', 'r') as meminfo:
+                with open("/proc/meminfo", "r") as meminfo:
                     for line in meminfo:
-                        if line.startswith('MemTotal'):
+                        if line.startswith("MemTotal"):
                             ram_kb = int(line.split()[1])
                             ram_gb = round(ram_kb / (1024**2), 2)
-                            file.write(MetashapeWorkflowLefolab.sep.join(["Total RAM (GB)", str(ram_gb)]) + "\n")
+                            file.write(
+                                MetashapeWorkflowLefolab.sep.join(["Total RAM (GB)", str(ram_gb)])
+                                + "\n"
+                            )
                             break
-            except:
-                file.write(MetashapeWorkflowLefolab.sep.join(["Total RAM", "Unable to determine"]) + "\n")
-            file.write(MetashapeWorkflowLefolab.sep.join(["Operating System", platform.system() + " " + platform.release()]) + "\n")
+            except Exception:
+                file.write(
+                    MetashapeWorkflowLefolab.sep.join(["Total RAM", "Unable to determine"]) + "\n"
+                )
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(
+                    ["Operating System", platform.system() + " " + platform.release()]
+                )
+                + "\n"
+            )
             try:
-                with open('/etc/os-release', 'r') as os_release:
+                with open("/etc/os-release", "r") as os_release:
                     for line in os_release:
-                        if line.startswith('PRETTY_NAME'):
-                            os_name = line.split('=')[1].strip().strip('"')
-                            file.write(MetashapeWorkflowLefolab.sep.join(["OS Distribution", os_name]) + "\n")
+                        if line.startswith("PRETTY_NAME"):
+                            os_name = line.split("=")[1].strip().strip('"')
+                            file.write(
+                                MetashapeWorkflowLefolab.sep.join(["OS Distribution", os_name])
+                                + "\n"
+                            )
                             break
-            except:
+            except Exception:
                 pass
-            file.write(MetashapeWorkflowLefolab.sep.join(["Python Version", platform.python_version()]) + "\n")
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["Python Version", platform.python_version()])
+                + "\n"
+            )
 
     def enable_and_log_gpu(self):
         """
@@ -395,15 +451,15 @@ class MetashapeWorkflowLefolab:
         while gpucount >= currentgpu:
             if gpustring != "":
                 gpustring = gpustring + ", "
-            gpustring = (
-                gpustring + gpustringraw.split("name': '")[currentgpu].split("',")[0]
-            )
+            gpustring = gpustring + gpustringraw.split("name': '")[currentgpu].split("',")[0]
             currentgpu = currentgpu + 1
         # gpustring = gpustringraw.split("name': '")[1].split("',")[0]
         gpu_mask = Metashape.app.gpu_mask
 
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Number of GPUs Found", str(gpucount)]) + "\n")
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["Number of GPUs Found", str(gpucount)]) + "\n"
+            )
             file.write(MetashapeWorkflowLefolab.sep.join(["GPU Model", gpustring]) + "\n")
             # file.write(MetashapeWorkflowLefolab.sep.join(["GPU Mask", str(gpu_mask)]) + "\n")
 
@@ -412,8 +468,7 @@ class MetashapeWorkflowLefolab:
                 Metashape.app.gpu_mask = 1
                 gpu_mask = Metashape.app.gpu_mask
                 file.write(
-                    MetashapeWorkflowLefolab.sep.join(["GPU Mask Enabled", str(gpu_mask)])
-                    + "\n"
+                    MetashapeWorkflowLefolab.sep.join(["GPU Mask Enabled", str(gpu_mask)]) + "\n"
                 )
 
             # This writes down all the GPU devices available
@@ -427,9 +482,7 @@ class MetashapeWorkflowLefolab:
             Metashape.app.settings.setValue("main/gpu_enable_cuda", "0")
 
         # Set GPU multiplier to value specified (2 is default)
-        Metashape.app.settings.setValue(
-            "main/depth_max_gpu_multiplier", self.cfg["gpu_multiplier"]
-        )
+        Metashape.app.settings.setValue("main/depth_max_gpu_multiplier", self.cfg["gpu_multiplier"])
 
         return True
 
@@ -442,7 +495,7 @@ class MetashapeWorkflowLefolab:
         4. Extracting mean weather values for the mission window
         5. Running R script to convert thermal images to calibrated TIF
         6. Updating image paths
-        """        
+        """
         timer8a = time.time()
 
         images_paths = self.cfg["images_path"]
@@ -454,13 +507,12 @@ class MetashapeWorkflowLefolab:
             ## Get paths to all the project photos
             a = glob.iglob(os.path.join(images_path, "**", "*.*"), recursive=True)
             b = [path for path in a]
-            photo_files = [
-                x for x in b 
-                if re.search(r"\_t.jpg$", x, re.IGNORECASE)
-            ]
+            photo_files = [x for x in b if re.search(r"\_t.jpg$", x, re.IGNORECASE)]
             all_photos.extend(photo_files)
         if not all_photos:
-            raise Exception("No thermal images found to process. Remove --thermal flag or check images path.")
+            raise Exception(
+                "No thermal images found to process. Remove --thermal flag or check images path."
+            )
 
         # Get thermal parameters
         thermal_params = self.cfg["thermal_parameters"]
@@ -471,48 +523,52 @@ class MetashapeWorkflowLefolab:
         weather_station_path = thermal_params["weather_station_path"]
         mission_start = thermal_params["mission_start"]
         mission_end = thermal_params["mission_end"]
-        
+
         # Ensure weather station path has /mnt/nfs prefix if needed
         if weather_station_path:
-            if weather_station_path.startswith("/conrad") or weather_station_path.startswith("/lefodata"):
+            if weather_station_path.startswith("/conrad") or weather_station_path.startswith(
+                "/lefodata"
+            ):
                 weather_station_path = "/mnt/nfs" + weather_station_path
 
         # If humidity or reflection is None, extract from weather station
         if (humidity is None or reflection is None) and weather_station_path:
             print("Extracting weather data from weather station...")
-            
+
             try:
                 if mission_start is None or mission_end is None:
                     # Get mission start/end times from filenames across all images paths
                     all_start_times = []
                     all_end_times = []
-                    
+
                     for images_path in images_paths:
                         start_time, end_time = get_start_end_datetime_filename(images_path)
                         all_start_times.append(start_time)
                         all_end_times.append(end_time)
-                    
+
                     # Get overall start and end from all paths
                     mission_start = min(all_start_times)
                     mission_end = max(all_end_times)
-                    
+
                     print(f"  Mission time window: {mission_start} to {mission_end} (local time)")
                 else:
                     # Use provided mission start/end times
                     mission_start = datetime.datetime.strptime(mission_start, "%Y-%m-%d %H:%M:%S")
                     mission_end = datetime.datetime.strptime(mission_end, "%Y-%m-%d %H:%M:%S")
-                    print(f"  Using provided mission time window: {mission_start} to {mission_end} (local time)")
+                    print(
+                        f"  Using provided mission time window: {mission_start} to {mission_end} (local time)"
+                    )
 
                 # Load weather data
                 weather_data = load_weather_data(weather_station_path)
-                
+
                 # Extract mean weather values
                 weather_mean = extract_weather_mean(weather_data, mission_start, mission_end)
-                
+
                 # Use extracted values if not provided
                 if humidity is None:
-                    if 'RH' in weather_mean and weather_mean['RH'] is not None:
-                        humidity = weather_mean['RH']
+                    if "RH" in weather_mean and weather_mean["RH"] is not None:
+                        humidity = weather_mean["RH"]
                         print(f"  Extracted humidity: {humidity:.1f}%")
                     else:
                         raise ValueError(
@@ -520,8 +576,8 @@ class MetashapeWorkflowLefolab:
                         )
 
                 if reflection is None:
-                    if 'AirT_C_Avg' in weather_mean and weather_mean['AirT_C_Avg'] is not None:
-                        reflection = weather_mean['AirT_C_Avg']
+                    if "AirT_C_Avg" in weather_mean and weather_mean["AirT_C_Avg"] is not None:
+                        reflection = weather_mean["AirT_C_Avg"]
                         print(f"  Extracted reflection temperature: {reflection:.1f}°C")
                     else:
                         raise ValueError(
@@ -529,19 +585,23 @@ class MetashapeWorkflowLefolab:
                         )
 
             except Exception as e:
-                raise ValueError(f"Could not extract weather data\n  {e}")
-        
+                raise ValueError(f"Could not extract weather data\n  {e}") from e
+
         # Process each images path
         for images_path in images_paths:
             print(f"Processing thermal images in: {images_path}")
-            
+
             # Define output directory for calibrated thermal images
-            # out_dir = "/mnt/nfs/lefodata/upload/tmp/thermal/" + self.run_id + "/" 
-            out_dir = "/mnt/nfs/conrad/labolaliberte_upload/tmp/thermal/" + self.run_id + "/" #lefodata access broken
-            
+            # out_dir = "/mnt/nfs/lefodata/upload/tmp/thermal/" + self.run_id + "/"
+            out_dir = (
+                "/mnt/nfs/conrad/labolaliberte_upload/tmp/thermal/" + self.run_id + "/"
+            )  # lefodata access broken
+
             # Path to R script
-            r_script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "R", "dji_m3t_rpeg_to_tif_v2_lefolab.r")
-            
+            r_script_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "R", "dji_m3t_rpeg_to_tif_v2_lefolab.r"
+            )
+
             # Build R command
             cmd = [
                 "Rscript",
@@ -551,34 +611,40 @@ class MetashapeWorkflowLefolab:
                 str(distance),
                 str(reflection),
                 images_path,
-                out_dir
+                out_dir,
             ]
-            
+
             print(f"Running: {' '.join(cmd)}")
-            
+
             # Run R script
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 print("Output:")
                 print(result.stdout)
-                    
+
             except subprocess.CalledProcessError as e:
                 print(f"Error: {e}")
                 print(f"stderr: {e.stderr}")
                 raise
-        
+
         # Update image paths to point to new calibrated TIF files
         self.cfg["images_path"] = out_dir
-        
+
         timer8b = time.time()
         time8 = diff_time(timer8b, timer8a)
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Thermal Image Processing", time8]) + "\n")
-            file.write(MetashapeWorkflowLefolab.sep.join(["  Humidity (%)", f"{humidity:.1f}"]) + "\n")
-            file.write(MetashapeWorkflowLefolab.sep.join(["  Reflection (°C)", f"{reflection:.1f}"]) + "\n")
-        
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["Thermal Image Processing", time8]) + "\n"
+            )
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["  Humidity (%)", f"{humidity:.1f}"]) + "\n"
+            )
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["  Reflection (°C)", f"{reflection:.1f}"]) + "\n"
+            )
+
         return True
 
     def add_photos(self, secondary=False):
@@ -593,7 +659,6 @@ class MetashapeWorkflowLefolab:
             images_paths = [images_paths]
 
         for images_path in images_paths:
-
             grp = self.doc.chunk.addCameraGroup()
 
             ## Get paths to all the project photos
@@ -606,23 +671,20 @@ class MetashapeWorkflowLefolab:
                 photo_pattern = r"\.(jpg|tif)$"
             else:
                 photo_pattern = r"\.jpg$"
-            photo_files = [
-                x for x in b
-                if re.search(photo_pattern, x, re.IGNORECASE)
-            ]
+            photo_files = [x for x in b if re.search(photo_pattern, x, re.IGNORECASE)]
 
             if self.cfg["addPhotos"]["multispectral"]:
-                self.doc.chunk.addPhotos(
-                    photo_files, layout=Metashape.MultiplaneLayout, group=grp
-                )
+                self.doc.chunk.addPhotos(photo_files, layout=Metashape.MultiplaneLayout, group=grp)
             else:
-                self.doc.chunk.addPhotos(photo_files, group=grp,
-                                         load_reference=self.cfg["addPhotos"]["load_reference"],
-                                         load_xmp_calibration=self.cfg["addPhotos"]["load_xmp_calibration"],
-                                         load_xmp_orientation=self.cfg["addPhotos"]["load_xmp_orientation"],
-                                         load_xmp_accuracy=self.cfg["addPhotos"]["load_xmp_accuracy"],
-                                         load_xmp_antenna=self.cfg["addPhotos"]["load_xmp_antenna"],
-                                         )
+                self.doc.chunk.addPhotos(
+                    photo_files,
+                    group=grp,
+                    load_reference=self.cfg["addPhotos"]["load_reference"],
+                    load_xmp_calibration=self.cfg["addPhotos"]["load_xmp_calibration"],
+                    load_xmp_orientation=self.cfg["addPhotos"]["load_xmp_orientation"],
+                    load_xmp_accuracy=self.cfg["addPhotos"]["load_xmp_accuracy"],
+                    load_xmp_antenna=self.cfg["addPhotos"]["load_xmp_antenna"],
+                )
 
         # Change the label of cameras to show full path
         for camera in self.doc.chunk.cameras:
@@ -631,19 +693,34 @@ class MetashapeWorkflowLefolab:
 
         # If specified, import reference for photos from a file (e.g. DJI PPK csv)
         if self.cfg["addPhotos"]["import_reference"]:
-            reference_path = f'{images_paths[0]}/{self.cfg["mission_id"]}_POS.txt'
+            reference_path = f"{images_paths[0]}/{self.cfg['mission_id']}_POS.txt"
             if os.path.exists(reference_path):
-                self.doc.chunk.importReference(reference_path, Metashape.ReferenceFormatCSV, delimiter=',',
-                                               skip_rows=1, crs = Metashape.CoordinateSystem(self.cfg["input_crs"]),
-                                               load_rotation=True, load_location_accuracy=True,
-                                               column_label=1, column_x=3, column_y=2, column_z=4,
-                                               column_sx=8, column_sy=8, column_sz=9, 
-                                               column_a=5, column_b=6, column_c=7)
+                self.doc.chunk.importReference(
+                    reference_path,
+                    Metashape.ReferenceFormatCSV,
+                    delimiter=",",
+                    skip_rows=1,
+                    crs=Metashape.CoordinateSystem(self.cfg["input_crs"]),
+                    load_rotation=True,
+                    load_location_accuracy=True,
+                    column_label=1,
+                    column_x=3,
+                    column_y=2,
+                    column_z=4,
+                    column_sx=8,
+                    column_sy=8,
+                    column_sz=9,
+                    column_a=5,
+                    column_b=6,
+                    column_c=7,
+                )
             else:
-                raise FileNotFoundError(f"Reference import specified but reference file not found at expected path: {reference_path}")
+                raise FileNotFoundError(
+                    f"Reference import specified but reference file not found at expected path: {reference_path}"
+                )
 
         # If specified, change the accuracy of the cameras for custom value
-        if self.cfg["addPhotos"]["use_xmp_accuracy"] == False:
+        if not self.cfg["addPhotos"]["use_xmp_accuracy"]:
             for cam in self.doc.chunk.cameras:
                 cam.reference.location_accuracy = Metashape.Vector(
                     [
@@ -671,11 +748,12 @@ class MetashapeWorkflowLefolab:
             sensor = self.doc.chunk.sensors[0]
             calib = Metashape.Calibration()
 
-            calib.load(self.cfg["camera_calibration_path"],
-                       format=self.cfg["cameracalibration"]["format"])
+            calib.load(
+                self.cfg["camera_calibration_path"], format=self.cfg["cameracalibration"]["format"]
+            )
             sensor.user_calib = calib
-            
-            sensor.fixed_params=self.cfg["cameracalibration"]["fixed_parameters"]
+
+            sensor.fixed_params = self.cfg["cameracalibration"]["fixed_parameters"]
 
         # No reflectance panel is used: reflectance comes from the DJI sunlight
         # sensor irradiance stored in each image's XMP. The RGB .JPG has no
@@ -704,7 +782,7 @@ class MetashapeWorkflowLefolab:
             keep_keypoints=self.cfg["alignPhotos"]["keep_keypoints"],
             generic_preselection=self.cfg["alignPhotos"]["generic_preselection"],
             reference_preselection=self.cfg["alignPhotos"]["reference_preselection"],
-            reference_preselection_mode=self.cfg["alignPhotos"]["reference_preselection_mode"],            
+            reference_preselection_mode=self.cfg["alignPhotos"]["reference_preselection_mode"],
             filter_stationary_points=self.cfg["alignPhotos"]["filter_stationary_points"],
             keypoint_limit=self.cfg["alignPhotos"]["keypoint_limit"],
             keypoint_limit_per_mpx=self.cfg["alignPhotos"]["keypoint_limit_per_mpx"],
@@ -715,7 +793,7 @@ class MetashapeWorkflowLefolab:
             subdivide_task=self.cfg["subdivide_task"],
             reset_alignment=self.cfg["alignPhotos"]["reset_alignment"],
         )
-        
+
         if not self.cfg["gcps"]:
             self.doc.save()
 
@@ -744,12 +822,12 @@ class MetashapeWorkflowLefolab:
         Pause processing and continue with GUI to add GCPs manually
         """
         chunk = self.doc.chunk
-        
+
         for camera in chunk.cameras:
             if not camera.photo:
                 continue
             old_path = camera.photo.path
-            
+
             if old_path.startswith("/mnt/nfs/lefodata/"):
                 new_path = old_path.replace("/mnt/nfs/lefodata/", "//lefodata/")
                 camera.photo.path = new_path
@@ -763,12 +841,15 @@ class MetashapeWorkflowLefolab:
         else:
             self.doc.save(self.project_file)
 
-        print("[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, and rerun with --load-project and --gcps to resume processing.")
-        gui_path = self.doc.path.replace('/mnt/nfs/conrad/', '//conrad-irbv.irbv.umontreal.ca/').replace('/', '\\')
+        print(
+            "[INFO] Photos alignment completed. Please add GCPs using the Metashape GUI, and rerun with --load-project and --gcps to resume processing."
+        )
+        gui_path = self.doc.path.replace(
+            "/mnt/nfs/conrad/", "//conrad-irbv.irbv.umontreal.ca/"
+        ).replace("/", "\\")
         print(f"[INFO] Command to rerun: {' '.join(sys.argv)} --load-project {self.doc.path}")
         print(f"[INFO] Open project on GUI server at: {gui_path}")
         return
-
 
     def build_depth_maps(self):
         """
@@ -823,10 +904,7 @@ class MetashapeWorkflowLefolab:
         ### Export points
 
         if self.cfg["buildPointCloud"]["export"] and self.cfg["quick_process"]:
-
-            output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_pg.copc.laz"
-            )
+            output_file = os.path.join(self.cfg["output_path"], self.run_id + "_pg.copc.laz")
 
             if self.cfg["buildPointCloud"]["classes"] == "ALL":
                 # call without classes argument (Metashape then defaults to all classes)
@@ -868,13 +946,13 @@ class MetashapeWorkflowLefolab:
             compression.tiff_big = self.cfg["buildDem"]["tiff_big"]
             compression.tiff_tiled = self.cfg["buildDem"]["tiff_tiled"]
             compression.tiff_overviews = self.cfg["buildDem"]["tiff_overviews"]
-            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+            compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
 
             start_time = time.time()
 
             # call without point classes argument (Metashape then defaults to all classes)
             self.doc.chunk.buildDem(
-                source_data=Metashape.PointCloudData,
+                source_data=self.cfg["buildDem"]["source_data"],
                 subdivide_task=self.cfg["subdivide_task"],
                 projection=projection,
                 resolution=self.cfg["buildDem"]["resolution"],
@@ -887,14 +965,9 @@ class MetashapeWorkflowLefolab:
 
             # Record processing time to log file
             with open(self.log_file, "a") as file:
-                file.write(
-                    MetashapeWorkflowLefolab.sep.join(["Build DSM", time_taken])
-                    + "\n"
-                )
+                file.write(MetashapeWorkflowLefolab.sep.join(["Build DSM", time_taken]) + "\n")
 
-            output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_dsm.tif"
-            )
+            output_file = os.path.join(self.cfg["output_path"], self.run_id + "_dsm.tif")
             if self.cfg["buildDem"]["export"] and self.cfg["quick_process"]:
                 self.doc.chunk.exportRaster(
                     path=output_file,
@@ -987,7 +1060,7 @@ class MetashapeWorkflowLefolab:
 
             if not dem_found:
                 raise ValueError(
-                    f"Error: DSM is not available.\n"
+                    "Error: DSM is not available.\n"
                     "Ensure the DSM has been generated because it is needed for orthomosaic generation."
                 )
 
@@ -1067,7 +1140,7 @@ class MetashapeWorkflowLefolab:
                 compression.tiff_big = self.cfg["buildOrthomosaic"]["tiff_big"]
                 compression.tiff_tiled = self.cfg["buildOrthomosaic"]["tiff_tiled"]
                 compression.tiff_overviews = self.cfg["buildOrthomosaic"]["tiff_overviews"]
-                compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+                compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
 
                 projection = Metashape.OrthoProjection()
                 projection.crs = Metashape.CoordinateSystem(self.cfg["project_crs"])
@@ -1105,7 +1178,9 @@ class MetashapeWorkflowLefolab:
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Depth Maps - HighDis", time5]) + "\n")
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["Build Depth Maps - HighDis", time5]) + "\n"
+            )
 
         self.doc.save()
 
@@ -1128,7 +1203,9 @@ class MetashapeWorkflowLefolab:
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(MetashapeWorkflowLefolab.sep.join(["Build Point Cloud - HighDis", time6]) + "\n")
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["Build Point Cloud - HighDis", time6]) + "\n"
+            )
 
         self.doc.save()
 
@@ -1139,10 +1216,7 @@ class MetashapeWorkflowLefolab:
         ### Export points
 
         if self.cfg["buildPointCloudHighDis"]["export"]:
-
-            output_file = os.path.join(
-                self.cfg["output_path"], self.run_id + "_pg.copc.laz"
-            )
+            output_file = os.path.join(self.cfg["output_path"], self.run_id + "_pg.copc.laz")
 
             if self.cfg["buildPointCloudHighDis"]["classes"] == "ALL":
                 # call without classes argument (Metashape then defaults to all classes)
@@ -1165,7 +1239,7 @@ class MetashapeWorkflowLefolab:
                 )
 
         return True
-    
+
     def build_dem_highdis(self):
         """
         Build end export DEM
@@ -1181,7 +1255,7 @@ class MetashapeWorkflowLefolab:
         compression.tiff_big = self.cfg["buildDemHighDis"]["tiff_big"]
         compression.tiff_tiled = self.cfg["buildDemHighDis"]["tiff_tiled"]
         compression.tiff_overviews = self.cfg["buildDemHighDis"]["tiff_overviews"]
-        compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+        compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
 
         # call without point classes argument (Metashape then defaults to all classes)
         self.doc.chunk.buildDem(
@@ -1199,14 +1273,9 @@ class MetashapeWorkflowLefolab:
 
         # Record processing time to log file
         with open(self.log_file, "a") as file:
-            file.write(
-                MetashapeWorkflowLefolab.sep.join(["Build DSM - HighDis", time7])
-                + "\n"
-            )
+            file.write(MetashapeWorkflowLefolab.sep.join(["Build DSM - HighDis", time7]) + "\n")
 
-        output_file = os.path.join(
-            self.cfg["output_path"], self.run_id + "_dsm.tif"
-        )
+        output_file = os.path.join(self.cfg["output_path"], self.run_id + "_dsm.tif")
         if self.cfg["buildDemHighDis"]["export"]:
             self.doc.chunk.exportRaster(
                 path=output_file,
@@ -1330,18 +1399,29 @@ class MetashapeWorkflowLefolab:
 
         return True
 
+    def export_cogs(self):
+        """
+        Convert the exported DSM and orthomosaic(s) to Cloud Optimized GeoTIFFs, keeping the originals
+        """
+        # Imported here: src.ms_lib.defaults imports this module, so a top-level import would be circular
+        from src.ms_lib.export import export_cogs
+
+        export_cogs(self.cfg["output_path"], self.run_id)
+
+        return True
+
     def finish_run(self):
         """
         Finish run (i.e., write completed time to log and save project)
         """
         # Update photo paths to be able to open project on GUI server if needed
         chunk = self.doc.chunk
-        
+
         for camera in chunk.cameras:
             if not camera.photo:
                 continue
             old_path = camera.photo.path
-            
+
             if old_path.startswith("/mnt/nfs/lefodata/"):
                 new_path = old_path.replace("/mnt/nfs/lefodata/", "//lefodata/")
                 camera.photo.path = new_path
@@ -1352,17 +1432,15 @@ class MetashapeWorkflowLefolab:
         # Save the project
         if not self.cfg["delete_project"]:
             self.doc.save()
-        
-        # Close the Metashape project and remove the lock file 
-        del self.doc  
+
+        # Close the Metashape project and remove the lock file
+        del self.doc
 
         # Finish logging results
         with open(self.log_file, "a") as file:
-            file.write(
-                MetashapeWorkflowLefolab.sep.join(["Run Completed", stamp_time()]) + "\n"
-            )
-            
-            if hasattr(self, 'processing_start_time'):
+            file.write(MetashapeWorkflowLefolab.sep.join(["Run Completed", stamp_time()]) + "\n")
+
+            if hasattr(self, "processing_start_time"):
                 processing_end_time = time.time()
                 total_time = diff_time(processing_end_time, self.processing_start_time)
                 file.write(
@@ -1376,9 +1454,12 @@ class MetashapeWorkflowLefolab:
             file.write("### END CONFIGURATION ###\n")
 
         # Move the output files to conrad_upload if the output path is the default one
-        mission_year = self.cfg['mission_id'][:4]
-        if self.cfg['output_path'] == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{self.cfg['mission_id']}/metashape/":
-            source_path = self.cfg['output_path']
+        mission_year = self.cfg["mission_id"][:4]
+        if (
+            self.cfg["output_path"]
+            == f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{self.cfg['mission_id']}/metashape/"
+        ):
+            source_path = self.cfg["output_path"]
             destination_path = f"/mnt/nfs/conrad/labolaliberte_upload/_data/metashape/{mission_year}/{self.cfg['mission_id']}/"
             os.makedirs(destination_path, exist_ok=True)
             os.system(f"mv {source_path}* {destination_path}")
@@ -1390,8 +1471,12 @@ class MetashapeWorkflowLefolab:
                 project_file = self.cfg["load_project"]
                 project_files_dir = os.path.splitext(project_file)[0] + ".files"
             else:
-                project_file = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"]))
-                project_files_dir = os.path.join(self.cfg["project_path"], ".".join([self.run_id_with_time, "files"]))
+                project_file = os.path.join(
+                    self.cfg["project_path"], ".".join([self.run_id_with_time, "psx"])
+                )
+                project_files_dir = os.path.join(
+                    self.cfg["project_path"], ".".join([self.run_id_with_time, "files"])
+                )
 
             if os.path.exists(project_file):
                 os.remove(project_file)

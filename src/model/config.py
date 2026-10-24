@@ -1,16 +1,17 @@
 """
 Configuration model for Metashape workflow using Pydantic for validation.
 """
-import re
 
-from datetime import datetime
+import re
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import Optional, Union, List, Any
+from typing import List, Optional, Union
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class MetashapeFiltering(str, Enum):
     """Filtering modes for depth maps"""
+
     NoFiltering = "Metashape.NoFiltering"
     MildFiltering = "Metashape.MildFiltering"
     ModerateFiltering = "Metashape.ModerateFiltering"
@@ -19,6 +20,7 @@ class MetashapeFiltering(str, Enum):
 
 class MetashapeBlending(str, Enum):
     """Blending modes for orthomosaic"""
+
     AverageBlending = "Metashape.AverageBlending"
     MosaicBlending = "Metashape.MosaicBlending"
     MinBlending = "Metashape.MinBlending"
@@ -28,9 +30,17 @@ class MetashapeBlending(str, Enum):
 
 class MetashapeReferencePreselectionMode(str, Enum):
     """Reference preselection modes"""
+
     Source = "Metashape.ReferencePreselectionSource"
     Estimated = "Metashape.ReferencePreselectionEstimated"
     Sequential = "Metashape.ReferencePreselectionSequential"
+
+
+class MetashapeDemSource(str, Enum):
+    """Data a DEM can be built from"""
+
+    PointCloud = "Metashape.PointCloudData"
+    TiePoints = "Metashape.TiePointsData"
 
 
 class MetashapeChunkAlignmentMethod(str, Enum):
@@ -39,6 +49,7 @@ class MetashapeChunkAlignmentMethod(str, Enum):
     Not Metashape constants: Document.alignChunks takes a plain int, so these
     readable names are mapped to it in src/ms_lib/process.py.
     """
+
     Points = "points"
     Markers = "markers"
     Cameras = "cameras"
@@ -46,6 +57,7 @@ class MetashapeChunkAlignmentMethod(str, Enum):
 
 class MetashapeCalibrationFormat(str, Enum):
     """Camera calibration formats"""
+
     XML = "Metashape.CalibrationFormatXML"
     Australis = "Metashape.CalibrationFormatAustralis"
     AustralisV7 = "Metashape.CalibrationFormatAustralisV7"
@@ -63,6 +75,7 @@ class MetashapeCalibrationFormat(str, Enum):
 
 class MetashapePointClass(str, Enum):
     """Point classes for point cloud classification"""
+
     Created = "Metashape.PointClass.Created"
     Unclassified = "Metashape.PointClass.Unclassified"
     Ground = "Metashape.PointClass.Ground"
@@ -88,6 +101,7 @@ class MetashapePointClass(str, Enum):
 
 class AddPhotosConfig(BaseModel):
     """Configuration for adding photos"""
+
     enabled: bool = True
     multispectral: bool = False
     use_xmp_accuracy: bool = True
@@ -102,10 +116,11 @@ class AddPhotosConfig(BaseModel):
 
 class CameraCalibrationConfig(BaseModel):
     """Configuration for camera calibration"""
+
     format: MetashapeCalibrationFormat = MetashapeCalibrationFormat.XML
     fixed_parameters: Union[str, List[str]] = ""
 
-    @field_validator('fixed_parameters')
+    @field_validator("fixed_parameters")
     @classmethod
     def validate_fixed_parameters(cls, v):
         if isinstance(v, str) and v == "":
@@ -114,12 +129,15 @@ class CameraCalibrationConfig(BaseModel):
             valid_params = ["F", "Cx", "Cy", "K1", "K2", "K3", "K4", "P1", "P2", "B1", "B2"]
             for param in v:
                 if param not in valid_params:
-                    raise ValueError(f"Invalid fixed parameter: {param}. Must be one of {valid_params}")
+                    raise ValueError(
+                        f"Invalid fixed parameter: {param}. Must be one of {valid_params}"
+                    )
         return v
 
 
 class AlignPhotosConfig(BaseModel):
     """Configuration for photo alignment"""
+
     enabled: bool = True
     downscale: int = Field(default=1, ge=0, le=8)
     adaptive_fitting: bool = False
@@ -127,13 +145,15 @@ class AlignPhotosConfig(BaseModel):
     reset_alignment: bool = False
     generic_preselection: bool = True
     reference_preselection: bool = True
-    reference_preselection_mode: MetashapeReferencePreselectionMode = MetashapeReferencePreselectionMode.Source
+    reference_preselection_mode: MetashapeReferencePreselectionMode = (
+        MetashapeReferencePreselectionMode.Source
+    )
     filter_stationary_points: bool = False
     keypoint_limit: int = Field(default=60000, ge=0)
     keypoint_limit_per_mpx: int = Field(default=1000, ge=0)
     tiepoint_limit: int = Field(default=0, ge=0)
 
-    @field_validator('downscale')
+    @field_validator("downscale")
     @classmethod
     def validate_downscale(cls, v):
         valid_values = [0, 1, 2, 4, 8]
@@ -144,6 +164,7 @@ class AlignPhotosConfig(BaseModel):
 
 class AlignChunksConfig(BaseModel):
     """Configuration for aligning chunks (Metashape: Document.alignChunks)"""
+
     method: MetashapeChunkAlignmentMethod = MetashapeChunkAlignmentMethod.Cameras
     fit_scale: bool = True
     downscale: int = Field(default=1, ge=0, le=8)
@@ -152,7 +173,7 @@ class AlignChunksConfig(BaseModel):
     mask_tiepoints: bool = False
     keypoint_limit: int = Field(default=60000, ge=0)
 
-    @field_validator('downscale')
+    @field_validator("downscale")
     @classmethod
     def validate_downscale(cls, v):
         valid_values = [0, 1, 2, 4, 8]
@@ -163,6 +184,7 @@ class AlignChunksConfig(BaseModel):
 
 class MergeChunksConfig(BaseModel):
     """Configuration for merging chunks (Metashape: Document.mergeChunks)"""
+
     merge_assets: bool = True
     merge_markers: bool = False
     merge_tiepoints: bool = False
@@ -178,13 +200,14 @@ class MergeChunksConfig(BaseModel):
 
 class BuildDepthMapsConfig(BaseModel):
     """Configuration for building depth maps"""
+
     enabled: bool = True
     downscale: int = Field(default=4, ge=1, le=16)
     filter_mode: MetashapeFiltering = MetashapeFiltering.AggressiveFiltering
     reuse_depth: bool = False
     max_neighbors: int = Field(default=16, ge=1, le=100)
 
-    @field_validator('downscale')
+    @field_validator("downscale")
     @classmethod
     def validate_downscale(cls, v):
         valid_values = [1, 2, 4, 8, 16]
@@ -195,6 +218,7 @@ class BuildDepthMapsConfig(BaseModel):
 
 class BuildPointCloudConfig(BaseModel):
     """Configuration for building point cloud"""
+
     enabled: bool = True
     keep_depth: bool = True
     max_neighbors: int = Field(default=100, ge=1)
@@ -202,8 +226,8 @@ class BuildPointCloudConfig(BaseModel):
     export: bool = True
     classes: Union[str, MetashapePointClass, List[Union[str, MetashapePointClass]]] = "ALL"
     remove_after_export: bool = False
-    
-    @field_validator('classes')
+
+    @field_validator("classes")
     @classmethod
     def validate_classes(cls, v):
         if isinstance(v, str):
@@ -211,21 +235,27 @@ class BuildPointCloudConfig(BaseModel):
                 return v
             valid_values = [e.value for e in MetashapePointClass]
             if v not in valid_values:
-                raise ValueError(f"classes must be 'ALL', a MetashapePointClass value, or a list of values. Got: {v}")
+                raise ValueError(
+                    f"classes must be 'ALL', a MetashapePointClass value, or a list of values. Got: {v}"
+                )
             return v
         if isinstance(v, list):
             valid_values = [e.value for e in MetashapePointClass]
             for class_val in v:
                 class_str = class_val if isinstance(class_val, str) else class_val.value
                 if class_str not in valid_values:
-                    raise ValueError(f"Invalid point class: {class_str}. Must be one of {valid_values}")
+                    raise ValueError(
+                        f"Invalid point class: {class_str}. Must be one of {valid_values}"
+                    )
         return v
 
 
 class BuildDemConfig(BaseModel):
     """Configuration for building DEM"""
+
     enabled: bool = True
     classify_ground_points: bool = False
+    source_data: MetashapeDemSource = MetashapeDemSource.PointCloud
     resolution: float = Field(default=0.0, ge=0)
     export: bool = True
     tiff_big: bool = True
@@ -236,6 +266,7 @@ class BuildDemConfig(BaseModel):
 
 class BuildOrthomosaicConfig(BaseModel):
     """Configuration for building orthomosaic"""
+
     enabled: bool = True
     blending: MetashapeBlending = MetashapeBlending.MosaicBlending
     fill_holes: bool = True
@@ -250,35 +281,44 @@ class BuildOrthomosaicConfig(BaseModel):
 
 class ThermalParametersConfig(BaseModel):
     """Configuration for thermal image processing"""
+
     emissivity: float = Field(default=0.957, ge=0.1, le=1.0)
     humidity: Optional[float] = Field(default=None, ge=20, le=100)
     distance: float = Field(default=25, ge=1, le=25)
     reflection: Optional[float] = Field(default=None, ge=-50, le=500)
-    weather_station_path: str = "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat"
+    weather_station_path: str = (
+        "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat"
+    )
     mission_start: Optional[str] = None
     mission_end: Optional[str] = None
-    
-    @field_validator('humidity', 'reflection')
+
+    @field_validator("humidity", "reflection")
     @classmethod
     def validate_optional_params(cls, v):
         # Allow None or valid numeric values
         return v
-    
-    @field_validator('mission_start', 'mission_end', mode='before')
+
+    @field_validator("mission_start", "mission_end", mode="before")
     @classmethod
     def validate_datetime_format(cls, v):
         if v is not None:
             import datetime
+
             try:
                 datetime.datetime.strptime(v, "%Y-%m-%d %H:%M:%S")
             except ValueError:
-                raise ValueError(f"Datetime must be in format 'YYYY-MM-DD HH:MM:SS', got: {v}")
+                raise ValueError(
+                    f"Datetime must be in format 'YYYY-MM-DD HH:MM:SS', got: {v}"
+                ) from None
         return v
 
 
 class MetashapeConfig(BaseModel):
     """Main configuration model for Metashape workflow"""
-    
+
+    # Use enum values instead of names
+    model_config = ConfigDict(use_enum_values=True)
+
     # Project parameters
     images_path: Union[str, List[str]] = ""
     output_path: str = ""
@@ -292,11 +332,11 @@ class MetashapeConfig(BaseModel):
     subdivide_task: bool = True
     use_cuda: bool = True
     gpu_multiplier: int = Field(default=2, ge=1)
-    
+
     # Camera calibration
     camera_calibration_path: str = ""
     cameracalibration: CameraCalibrationConfig = Field(default_factory=CameraCalibrationConfig)
-    
+
     # Processing steps
     addPhotos: AddPhotosConfig = Field(default_factory=AddPhotosConfig)
     alignPhotos: AlignPhotosConfig = Field(default_factory=AlignPhotosConfig)
@@ -309,45 +349,44 @@ class MetashapeConfig(BaseModel):
     buildPointCloud: BuildPointCloudConfig = Field(default_factory=BuildPointCloudConfig)
     buildDem: BuildDemConfig = Field(default_factory=BuildDemConfig)
     buildOrthomosaic: BuildOrthomosaicConfig = Field(default_factory=BuildOrthomosaicConfig)
-    
+
     # High quality / Disable filtering mode
     quick_process: bool = False
     buildDepthMapsHighDis: BuildDepthMapsConfig = Field(default_factory=BuildDepthMapsConfig)
     buildPointCloudHighDis: BuildPointCloudConfig = Field(default_factory=BuildPointCloudConfig)
     buildDemHighDis: BuildDemConfig = Field(default_factory=BuildDemConfig)
-    
+
     # GCP workflow flag
     gcps: bool = False
-    
+
     # Thermal processing
     thermal: bool = False
     thermal_parameters: ThermalParametersConfig = Field(default_factory=ThermalParametersConfig)
 
-    
-    @field_validator('mission_id')
+    @field_validator("mission_id")
     @classmethod
     def validate_mission_id(cls, v):
-        if v and not re.match(r'^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$', v):
-            raise ValueError(
-                "mission_id must be in format '<yyyymmdd>_<site>_<optional>_<sensor>'"
-            )
+        if v and not re.match(
+            r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$", v
+        ):
+            raise ValueError("mission_id must be in format '<yyyymmdd>_<site>_<optional>_<sensor>'")
         return v
-    
-    @field_validator('input_crs')
+
+    @field_validator("input_crs")
     @classmethod
     def validate_input_crs(cls, v):
-        if not re.match(r'^EPSG::\d+$', v):
+        if not re.match(r"^EPSG::\d+$", v):
             raise ValueError("input_crs must be in format 'EPSG::<code>'")
         return v
 
-    @field_validator('project_crs')
+    @field_validator("project_crs")
     @classmethod
     def validate_project_crs(cls, v):
-        if v and not re.match(r'^EPSG::\d+$', v):
+        if v and not re.match(r"^EPSG::\d+$", v):
             raise ValueError("project_crs must be in format 'EPSG::<code>'")
         return v
-    
-    @field_validator('images_path')
+
+    @field_validator("images_path")
     @classmethod
     def validate_images_path(cls, v):
         if isinstance(v, list):
@@ -355,98 +394,104 @@ class MetashapeConfig(BaseModel):
                 if not isinstance(path, str):
                     raise ValueError("All photo paths must be strings")
         return v
-    
-    @model_validator(mode='after')
+
+    @model_validator(mode="after")
     def validate_paths(self):
         """Validate that required paths are set when enabled"""
         if self.addPhotos.enabled and not self.images_path:
             raise ValueError("images_path must be set when addPhotos is enabled")
         return self
-    
-    class Config:
-        # Use enum values instead of names
-        use_enum_values = True
 
 
-def load_config(config_file: str, override_dict: Optional[dict] = None) -> tuple[MetashapeConfig, dict]:
+def load_config(
+    config_file: str, override_dict: Optional[dict] = None
+) -> tuple[MetashapeConfig, dict]:
     """
     Load and validate configuration from YAML file with optional overrides
-    
+
     Args:
         config_file: Path to YAML configuration file
         override_dict: Dictionary of values to override from CLI arguments
-        
+
     Returns:
         Tuple of (validated MetashapeConfig object, original config dict)
         The dict is suitable for passing to workflow functions
     """
-    import yaml
     import os
+
+    import yaml
+
     from src.utilis import calculate_median_coordinates, calculate_utm_epsg
-    
+
     # Load YAML file
-    with open(config_file, 'r') as f:
+    with open(config_file, "r") as f:
         config_dict = yaml.safe_load(f)
-    
+
     # Apply overrides from CLI
     if override_dict:
         for key, value in override_dict.items():
             if value is not None:
                 config_dict[key] = value
-    
+
     # Extract mission_id from images_path if not provided
-    if not config_dict.get('mission_id') and config_dict.get('images_path'):
-        images_path = config_dict['images_path']
+    if not config_dict.get("mission_id") and config_dict.get("images_path"):
+        images_path = config_dict["images_path"]
         # Handle list - use first path
         if isinstance(images_path, list):
             images_path = images_path[0]
-        
+
         mission_id = os.path.basename(os.path.normpath(images_path))
         # Validate format
-        mission_id_pattern = r'^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$'
+        mission_id_pattern = r"^(?!_)\d{8}_[0-9a-z]{2,16}(?:_[0-9a-z]{2,16}){0,1}_[0-9a-z]{2,16}$"
         if re.match(mission_id_pattern, mission_id):
-            config_dict['mission_id'] = mission_id
+            config_dict["mission_id"] = mission_id
         else:
             raise ValueError(
                 f"Could not extract valid mission_id from images path: '{mission_id}'."
                 " mission_id should be in the format: '<yyyymmdd>_<site>_<optional>_<sensor>'."
             )
-    
+
     # Raise error if mission_id is still not set
-    if not config_dict.get('mission_id'):
+    if not config_dict.get("mission_id"):
         raise ValueError(
             "mission_id is required but not provided. "
             "Please specify mission_id in your config file or use --mission-id CLI argument."
         )
-    
+
     # Generate default paths if not provided
-    mission_id = config_dict['mission_id']
+    mission_id = config_dict["mission_id"]
     mission_year = mission_id[:4]
-    
-    if not config_dict.get('project_path'):
-        if config_dict.get('load_project'):
-            config_dict['project_path'] = os.path.dirname(config_dict['load_project'])
+
+    if not config_dict.get("project_path"):
+        if config_dict.get("load_project"):
+            config_dict["project_path"] = os.path.dirname(config_dict["load_project"])
         else:
-            config_dict['project_path'] = f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{mission_id}"
-    
-    if not config_dict.get('output_path'):
-        config_dict['output_path'] = f"{config_dict['project_path']}/metashape/"
-    
+            config_dict["project_path"] = (
+                f"/mnt/nfs/conrad/labolaliberte_metashape_projects/{mission_year}/{mission_id}"
+            )
+
+    if not config_dict.get("output_path"):
+        config_dict["output_path"] = f"{config_dict['project_path']}/metashape/"
+
     # Calculate project_crs from photos if not provided
-    if not config_dict.get('project_crs') and config_dict.get('images_path'):
-        images_path = config_dict['images_path']
+    if not config_dict.get("project_crs") and config_dict.get("images_path"):
+        images_path = config_dict["images_path"]
         print("[INFO] Calculating project CRS from photos...")
-        
+
         try:
             median_latitude, median_longitude = calculate_median_coordinates(images_path)
-            config_dict['project_crs'] = calculate_utm_epsg(median_latitude, median_longitude)
-            print(f"[INFO] Using {config_dict['project_crs']} as project CRS based on median photo coordinates.")
+            config_dict["project_crs"] = calculate_utm_epsg(median_latitude, median_longitude)
+            print(
+                f"[INFO] Using {config_dict['project_crs']} as project CRS based on median photo coordinates."
+            )
         except Exception as e:
             raise ValueError(
                 f"Failed to calculate project_crs from photos: {e}\n"
                 "Please specify project_crs manually in the config file or as a CLI argument."
-            )
-    
+            ) from e
+
     # Validate and return both the Pydantic model and the dict
     validated_config = MetashapeConfig(**config_dict)
-    return validated_config, config_dict
+    cfg = validated_config.model_dump(mode="json")
+    cfg["config_file"] = config_file  # keep it in the run log
+    return validated_config, cfg

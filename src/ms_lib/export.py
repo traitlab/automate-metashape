@@ -1,7 +1,8 @@
 """Export helpers for common Metashape output products.
 
-Raster exports use Deflate-compressed, tiled, overview-carrying (Big)TIFFs and an
-explicit projection; point clouds are exported as COPC LAZ. The nodata value and
+Raster exports use LZW-compressed, tiled, overview-carrying (Big)TIFFs and an explicit
+projection (export_cogs then writes Deflate-compressed COG copies); point clouds are
+exported as COPC LAZ. The nodata value and
 the TIFF flags come from the same config block as the corresponding build step
 ("buildDem" for the DEM, "buildOrthomosaic" for the ortho), which is how the
 pipeline pairs them too.
@@ -23,12 +24,12 @@ from src.ms_lib.defaults import global_param, step_params
 
 
 def _image_compression(tiff_big, tiff_tiled, tiff_overviews):
-    """Build the standard TIFF compression settings (Deflate)."""
+    """Build the standard TIFF compression settings (LZW)."""
     compression = Metashape.ImageCompression()
     compression.tiff_big = tiff_big
     compression.tiff_tiled = tiff_tiled
     compression.tiff_overviews = tiff_overviews
-    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionDeflate
+    compression.tiff_compression = Metashape.ImageCompression.TiffCompressionLZW
     return compression
 
 
@@ -65,9 +66,7 @@ def export_orthomosaic(
         projection=_projection(crs),
         nodata_value=p["nodata"],
         source_data=Metashape.OrthomosaicData,
-        image_compression=_image_compression(
-            p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]
-        ),
+        image_compression=_image_compression(p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]),
     )
 
 
@@ -108,7 +107,7 @@ def _gdal_finalize(src, dst, names, to_8bit, tiff_big, tiff_tiled, tiff_overview
     vrt = dst + ".tmp.vrt"
     _gdal("gdal_translate", "-q", "-of", "VRT", src, vrt)
     tree = ET.parse(vrt)
-    for band, name in zip(tree.getroot().iter("VRTRasterBand"), names):
+    for band, name in zip(tree.getroot().iter("VRTRasterBand"), names, strict=True):
         ET.SubElement(band, "Description").text = name
     tree.write(vrt)
 
@@ -117,8 +116,22 @@ def _gdal_finalize(src, dst, names, to_8bit, tiff_big, tiff_tiled, tiff_overview
         creation += ["-co", "TILED=YES"]
     if to_8bit:
         # -b mask turns the nodata pixels into the alpha band; uint8 can't hold the -32767 nodata value
-        bands = ["-ot", "Byte", "-b", "1", "-b", "2", "-b", "3", "-b", "mask",
-                 "-colorinterp", "red,green,blue,alpha", "-a_nodata", "none"]
+        bands = [
+            "-ot",
+            "Byte",
+            "-b",
+            "1",
+            "-b",
+            "2",
+            "-b",
+            "3",
+            "-b",
+            "mask",
+            "-colorinterp",
+            "red,green,blue,alpha",
+            "-a_nodata",
+            "none",
+        ]
         creation += ["-co", "PREDICTOR=2", "-co", "ALPHA=YES"]
     else:
         bands = []
@@ -130,6 +143,31 @@ def _gdal_finalize(src, dst, names, to_8bit, tiff_big, tiff_tiled, tiff_overview
 
     os.remove(vrt)
     os.remove(src)
+
+
+def export_cogs(output_path, run_id, suffixes=("_dsm", "_rgb", "_tir", "_ms")):
+    """Write a Cloud Optimized GeoTIFF ``<run_id><suffix>.cog.tif`` next to each exported raster.
+
+    The original ``.tif`` files are kept; suffixes without an exported raster are skipped. The COG
+    driver's PREDICTOR=YES picks the floating-point predictor (3) for float rasters such as the DSM
+    and the horizontal one (2) for integer rasters such as the RGB.
+    """
+    if shutil.which("gdal_translate") is None:
+        print("[export] GDAL command-line tools not found: skipping COG conversion")
+        return
+    for suffix in suffixes:
+        src = os.path.join(output_path, run_id + suffix + ".tif")
+        if not os.path.exists(src):
+            continue
+        dst = os.path.join(output_path, run_id + suffix + ".cog.tif")
+        print(f"[export] Writing {dst}")
+        _gdal(
+            "gdal_translate", "-q", "-of", "COG",
+            "-co", "COMPRESS=DEFLATE", "-co", "PREDICTOR=YES", "-co", "LEVEL=9",
+            "-co", "BIGTIFF=IF_SAFER", "-co", "BLOCKSIZE=128", "-co", "OVERVIEWS=AUTO",
+            "-co", "NUM_THREADS=8",
+            src, dst,
+        )  # fmt: skip
 
 
 def export_multispectral_orthomosaic(
@@ -199,8 +237,15 @@ def export_multispectral_orthomosaic(
             ),
         )
         if use_gdal:
-            _gdal_finalize(export_path, path, [name for _, name in bands], to_8bit,
-                           p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"])
+            _gdal_finalize(
+                export_path,
+                path,
+                [name for _, name in bands],
+                to_8bit,
+                p["tiff_big"],
+                p["tiff_tiled"],
+                p["tiff_overviews"],
+            )
 
 
 def export_dem(
@@ -230,9 +275,7 @@ def export_dem(
         projection=_projection(crs),
         nodata_value=p["nodata"],
         source_data=Metashape.ElevationData,
-        image_compression=_image_compression(
-            p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]
-        ),
+        image_compression=_image_compression(p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]),
     )
 
 

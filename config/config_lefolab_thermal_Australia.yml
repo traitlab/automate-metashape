@@ -100,6 +100,7 @@ buildPointCloud: # (Metashape: buildPointCloud and exportPoints)
 buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaster)
     enabled: True
     classify_ground_points: False # Should ground points be classified as part of this step? Note that an alternative is to calculate them as a part of buildPointCloud (above)
+    source_data: Metashape.PointCloudData # Data to build the DEM from. Options: Metashape.PointCloudData (dense point cloud, needs buildDepthMaps and buildPointCloud), Metashape.TiePointsData (equivalent to sparse cloud)
     resolution: 0 # DSM resolution. Only affects DSM built using the mesh (other DSM types are set by Metashape and not customizable). Note that this also sets the resolution of the orthomosaic built from this DSM, which is 1/4 of the DSM resolution. If using a mesh-derived DSM, and you also desire an orthomosaic with maximal detail, set the DEM resolution to 4x your GSD. Set to 0 to use Metashape-determined default.
     export: True # Whether to export DEM(s)
     tiff_big: True # Use BigTIFF format? Required for larger projects with large DEMs
