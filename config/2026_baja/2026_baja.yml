@@ -1,0 +1,186 @@
+# This is the default yaml configuration for a metashape run. It is possible to use it as a template to create a new configuration file.
+# Do not modify this file directly. Instead, create a copy and modify that file.
+
+#### Project parameters
+# Path to the directory of flight photos.
+# If there are multiple photo folders, set path to the folder that contains all the photo folders,
+# or provide a list of paths via the YAML list syntax (e.g., ["/path/to/photo/folder1", "/path/to/photo/folder2"]).
+# If there are no photos to add (e.g., this is an existing project that already has photos in it, set to an empty string ("").
+images_path: ""
+
+# Path for exports (e.g., points, DSM, orthomosaic). Will be created if does not exist.
+output_path: ""
+
+# Path to save Metashape project file (.psx) and processing log. Will be created if does not exist.
+project_path: ""
+delete_project: False # Should the Metashape project file be deleted after processing? If True, it will be deleted after processing.
+
+# Identifier for the run. Will be used in naming output files. It should be in the format: "<yyyymmdd>_<site>_<optional free text; no space, no special chars>_<sensor>".
+mission_id: ""
+
+# Input photos CRS EPSG code. Value should be "EPSG::4326" except in rare cases where RTK or NTRIP provider used a different datum.
+input_crs: "EPSG::4326"
+
+# Projected CRS EPSG code that project outputs should be in (projection should be in meter units and intended for the project area).
+# If blank, CRS will be determined from photo GPS data, using applicable UTM zone.
+project_crs: "EPSG::32612"
+
+# Project to load. If blank, creates a new empty project.
+# Even if loading an existing project, all processing is saved as a new project. The original project file is not modified (except when new_chunk is enabled).
+load_project: ""
+new_chunk: False # When loading an existing project, should a new chunk be created inside the loaded project?
+
+#### Processing parameters:
+## It is best to leave the default settings of this section unchanged.
+## Steps can be run or skipped using the 'enabled' parameter. If enabled == False, everything else in the step is irrelevant.
+## The metashape functions powering each of these steps are listed in the comments in parentheses.
+## Refer to Metashape documentation for full parameter definitions: https://www.agisoft.com/pdf/metashape_python_api_2_2_2.pdf
+
+# Should the photos at the path(s) listed above be added to the project? Can disable if, for
+# example, you only want to add GCPs (or do additional processing) to an existing project.
+addPhotos: # (Metashape: addPhotos)
+  enabled: True # This applies to the main photos specified in photo_path above. Secondary photos are always added and aligned if a path (or paths) is provided.
+  multispectral: False # Is this a multispectral photo set? If RGB, set to False.
+  use_xmp_accuracy: True # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
+  photos_accuracy: 5 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
+  load_reference: True
+  import_reference: False # Whether to import new reference for photos (DJI PPK csv) from a file. Default is False.
+  load_xmp_calibration: True
+  load_xmp_orientation: True
+  load_xmp_accuracy: True
+  load_xmp_antenna: True
+
+thermal: False # Are these thermal images? If True, transform to .tif format by using thermal parameters below.
+thermal_parameters:
+    emissivity: 0.957 # Range: 0.1-1.0 https://royalsocietypublishing.org/doi/pdf/10.1098/rsos.181281 (e.g., average 0.957 for vegetation)
+    humidity: null # Range: 20-100 %    Default: extract from weather station data
+    distance: 25 # Range: 1-25 m    Altitude - object height (set to 25 if camera-target-distance > 25 m)
+    reflection: null # Range: -50-500    Represents the temperature of the day    Default: extract from weather station data
+    weather_station_path: "/conrad/labolaliberte_data/logs_weather/projects/2025_wa_roberge/CR1000_OneMin.dat" # Path to weather station data to extract humidity and reflected temperature. If not provided, default values of 70% humidity and 25C reflection temperature are used.
+    mission_start: null # Format:"2024-06-01 00:00:00"    Start time of the flight mission in local time (to align with weather station data). If not provided, using the timestamp by filename of the first photo.
+    mission_end: null # Format:"2024-06-01 23:59:59"    End time of the flight mission in local time (to align with weather station data). IF not provided, using the timestamp by filename of the last photo.
+
+camera_calibration_path: "" # Path to camera calibration file. If not provided, Metashape will ignore this step.
+cameracalibration:
+    format: Metashape.CalibrationFormatXML # Options: CalibrationFormatXML, CalibrationFormatPix4D, CalibrationFormatOpenCV, etc.
+    fixed_parameters: "" # Parameters to fix, provided as a list. ex: ["F","Cx","Cy","K1","K2","K3","P1","P2"]. If empty, no parameters fixed.
+
+alignPhotos: # (Metashape: matchPhotos, alignCameras)
+    enabled: True
+    downscale: 1 # How much to coarsen the photos when searching for tie points. Higher number for blurrier photos or when there are small surfaces that may move between photos (such as leaves). (0 - Highest, 1 - High, 2 - Medium, 4 - Low, 8 - Lowest). (https://www.agisoft.com/forum/index.php?topic=11697.0).
+    adaptive_fitting: False # Should the camera lens model be fit at the same time as aligning photos?
+    keep_keypoints: True # Should keypoints from matching photos be stored in the project? Required if you later want to add more photos and align them to the previously aligned photos without redoing the original alignment.
+    reset_alignment: False # When running an alignment, if any of the photos were already aligned, should we keep that alignment? Or reset it so we align everything anew?
+    generic_preselection: True # When matching photos, use a much-coarsened version of each photo to narrow down the potential neighbors to pair? Works well if the photos have high altitude above the surface and high overlap (e.g. a 120m nadir 90/90 overlap mission), but doesn't work well for low-altitude and/or highly oblique photos (e.g. a 80m 25deg pitch 80/80 overlap mission)
+    reference_preselection: True # When matching photos, use the camera location data to narrow down the potential neighbors to pair?
+    reference_preselection_mode: Metashape.ReferencePreselectionSource # When matching photos, use the camera location data to narrow down the potential neighbors to pair?
+    filter_stationary_points: False # Exclude tie points which are stationary across images.
+    keypoint_limit: 60000 # Default to 40000
+    keypoint_limit_per_mpx: 1000 # Default to 1000
+    tiepoint_limit: 0 # Default to 4000, 0 for no limit
+
+gcps: False # Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --gcps to continue.
+
+# The two steps below act on several chunks at once, so main.py doesn't run them currently (it processes one chunk per run).
+# They are reached through 'python scripts/run_task.py --task align_chunks --task merge_chunks', the scripted equivalent
+# of the GUI's Workflow -> Align Chunks / Merge Chunks.
+# A photo held by two of the merged chunks stays as two cameras in the merged chunk: each was aligned from its own chunk's
+# tie points, which the other copy doesn't have. Run '--task deduplicate_cameras' afterwards to leave one camera per photo.
+alignChunks: # (Metashape: Document.alignChunks)
+    method: cameras # How to match chunks to each other. Options: points, markers, cameras. "cameras" matches cameras by label, use "points" for chunks that share no cameras, "markers" for GCP-based alignment. Note Metashape's own default is "points".
+    fit_scale: True # Allow chunk scale to change during alignment. Set to False for RTK-georeferenced chunks, whose scale is already known.
+    downscale: 1 # Alignment accuracy, only used by the "points" method. (0 - Highest, 1 - High, 2 - Medium, 4 - Low, 8 - Lowest)
+    generic_preselection: False # Use a coarsened version of each photo to narrow down the pairs to match. Only used by the "points" method.
+    filter_mask: False # Filter points by mask.
+    mask_tiepoints: False # Apply the mask filter to tie points.
+    keypoint_limit: 60000 # Maximum number of points per photo, only used by the "points" method.
+
+mergeChunks: # (Metashape: Document.mergeChunks)
+    merge_assets: True # Merge the default assets of the source chunks.
+    merge_markers: False # Merge markers (matched by label).
+    merge_tiepoints: False # Merge tie points.
+    # The copy_* flags below decide which built products come across into the merged chunk.
+    copy_laser_scans: True
+    copy_masks: True
+    copy_depth_maps: True
+    copy_point_clouds: True
+    copy_models: True
+    copy_tiled_models: True
+    copy_elevations: True
+    copy_orthomosaics: True
+
+buildDepthMaps: # (Metashape: buildDepthMaps)
+    enabled: False
+    downscale: 4 # How much to coarsen the photos when searching for matches to build the point cloud. For large photosets, values < 4 likely take prohibitively long. (1 - Ultra high, 2 - High, 4 - Medium, 8 - Low, 16 - Lowest) (https://www.agisoft.com/forum/index.php?topic=11697.0).
+    filter_mode: Metashape.AggressiveFiltering # How to filter the depth map. Options are NoFiltering, MildFiltering, ModerateFiltering, AggressiveFiltering. Aggressive filtering removes detail and makes worse DEMs (at least for forest). NoFiltering takes very long. In trials, it never completed.
+    reuse_depth: False # Purpose unknown.
+    max_neighbors: 16 # Maximum number of neighboring photos to use for estimating depth map. Higher numbers may increase accuracy but dramatically increase processing time.
+
+buildPointCloud: # (Metashape: buildPointCloud and exportPoints)
+    enabled: False
+    keep_depth: True # If False, removes depth maps from project data after building point cloud
+    max_neighbors: 100 # Maximum number of neighboring photos to use for estimating point cloud. Higher numbers may increase accuracy but dramatically increase processing time.
+    classify_ground_points: False # Should ground points be classified as a part of this step? Must be enabled (either here or in buildDem, below) if a digital terrain model (DTM) is needed either for orthomosaic or DTM export. Enabling here is an alternative to enabling as a component of buildDem (below). It depends on which stage you want the classification to be done at. If you already have a point cloud but it's unclassified, then don't do it as part of this stage as it would require computing the point cloud again.
+    export: True # Whether to export point cloud file.
+    classes: "ALL" # Point classes to export. Must be a list. Or can set to "ALL" to use all points. An example of a specific class is: Metashape.PointClass.Ground
+    remove_after_export: False # Remove point cloud from project after export of all dependencies (DEMs) to reduce the metashape project file size
+
+buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaster)
+    enabled: True
+    classify_ground_points: False # Should ground points be classified as part of this step? Note that an alternative is to calculate them as a part of buildPointCloud (above)
+    source_data: Metashape.TiePointsData # Data to build the DEM from. Options: Metashape.PointCloudData (dense point cloud, needs buildDepthMaps and buildPointCloud), Metashape.TiePointsData (tie points from alignment; much coarser, but no point cloud needed).
+    resolution: 0 # DSM resolution. Only affects DSM built using the mesh (other DSM types are set by Metashape and not customizable). Note that this also sets the resolution of the orthomosaic built from this DSM, which is 1/4 of the DSM resolution. If using a mesh-derived DSM, and you also desire an orthomosaic with maximal detail, set the DEM resolution to 4x your GSD. Set to 0 to use Metashape-determined default.
+    export: True # Whether to export DEM(s)
+    tiff_big: True # Use BigTIFF format? Required for larger projects with large DEMs
+    tiff_tiled: True # Use tiled TIFF? This is related to internal file architecture.
+    nodata: -32767 # Value used to represent nodata.
+    tiff_overviews: True # Include coarse-scale raster data in file for quick display in GIS.
+
+buildOrthomosaic: # (Metashape: buildOrthomosaic, exportRaster)
+    enabled: True
+    blending: Metashape.MosaicBlending # Photo blending mode. Options include AverageBlending, MosaicBlending, MinBlending, MaxBlending, DisabledBlending
+    fill_holes: True # Fill holes in orthomosaic where no photo data exist by interpolating?
+    refine_seamlines: False # Use smart algorithm to identify photo seamlines where they will least distort.
+    export: True # Whether to export orthomosaic(s)
+    tiff_big: True # Use BigTIFF format? Required for larger projects with large DEMs
+    tiff_tiled: True # Use tiled TIFF? This is related to internal file architecture. Tiled may be (semi-)equivalent to COG.
+    nodata: -32767 # Value used to represent nodata.
+    tiff_overviews: True # Include coarse-scale raster data in file for quick display in GIS.
+    remove_after_export: False # Remove orthomosaic from project after export to reduce the metashape project file size
+
+quick_process: False # If True, disables the HighDis settings to enable faster processing and skip the second High quality / Disable filtering run with parameters below.
+
+buildDepthMapsHighDis: # (Metashape: buildDepthMaps)
+    downscale: 2 # How much to coarsen the photos when searching for matches to build the point cloud. For large photosets, values < 4 likely take prohibitively long. (1 - Ultra high, 2 - High, 4 - Medium, 8 - Low, 16 - Lowest) (https://www.agisoft.com/forum/index.php?topic=11697.0).
+    filter_mode: Metashape.NoFiltering # How to filter the depth map. Options are NoFiltering, MildFiltering, ModerateFiltering, AggressiveFiltering. Aggressive filtering removes detail and makes worse DEMs (at least for forest). NoFiltering takes very long. In trials, it never completed.
+    reuse_depth: False # Purpose unknown.
+    max_neighbors: 16 # Maximum number of neighboring photos to use for estimating depth map. Higher numbers may increase accuracy but dramatically increase processing time.
+
+buildPointCloudHighDis: # (Metashape: buildPointCloud, (optionally) classifyGroundPoints, and exportPoints)
+    keep_depth: True # If False, removes depth maps from project data after building point cloud
+    max_neighbors: 100 # Maximum number of neighboring photos to use for estimating point cloud. Higher numbers may increase accuracy but dramatically increase processing time.
+    classify_ground_points: False # Should ground points be classified as a part of this step? Must be enabled (either here or in buildDem, below) if a digital terrain model (DTM) is needed either for orthomosaic or DTM export. Enabling here is an alternative to enabling as a component of buildDem (below). It depends on which stage you want the classification to be done at. If you already have a point cloud but it's unclassified, then don't do it as part of this stage as it would require computing the point cloud again.
+    export: True # Whether to export point cloud file.
+    classes: "ALL" # Point classes to export. Must be a list. Or can set to "ALL" to use all points. An example of a specific class is: Metashape.PointClass.Ground
+    remove_after_export: False # Remove point cloud from project after export of all dependencies (DEMs) to reduce the metashape project file size
+
+buildDemHighDis: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaster)
+    classify_ground_points: False # Should ground points be classified as part of this step? Note that an alternative is to calculate them as a part of buildPointCloud (above)
+    resolution: 0 # DSM resolution. Only affects DSM built using the mesh (other DSM types are set by Metashape and not customizable). Note that this also sets the resolution of the orthomosaic built from this DSM, which is 1/4 of the DSM resolution. If using a mesh-derived DSM, and you also desire an orthomosaic with maximal detail, set the DEM resolution to 4x your GSD. Set to 0 to use Metashape-determined default.
+    export: True # Whether to export DEM(s)
+    tiff_big: True # Use BigTIFF format? Required for larger projects with large DEMs
+    tiff_tiled: True # Use tiled TIFF? This is related to internal file architecture.
+    nodata: -32767 # Value used to represent nodata.
+    tiff_overviews: True # Include coarse-scale raster data in file for quick display in GIS.
+
+#### Extra project parameters
+## It is best to leave the default settings of this section unchanged.
+# Enable metashape "fine-level task subdivision" which reduces memory use by breaking processing into independent chunks that are run in series.
+# Assuming there's enough memory, it seems to run 10-20% faster by disabling subdividing. But large projects can run out memory and fail if subdivide is not enabled.
+subdivide_task: True
+
+# Should CUDA GPU driver be used? Alternative is OpenCL.
+use_cuda: True
+
+# What value to use for the Metashape tweak "depth_max_gpu_multiplier"?
+gpu_multiplier: 2
