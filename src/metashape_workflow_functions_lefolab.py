@@ -133,6 +133,12 @@ class MetashapeWorkflowLefolab:
                 # Align photos
                 if self.cfg["alignPhotos"]["enabled"]:
                     self.align_photos()
+
+                # Uncheck references that disagree with alignment, then re-optimize
+                if self.cfg["optimizeCameras"]["enabled"]:
+                    self.optimize_cameras()
+
+                if self.cfg["alignPhotos"]["enabled"] or self.cfg["optimizeCameras"]["enabled"]:
                     self.reset_region()
 
             # Add GCPs manually via GUI if specified
@@ -803,6 +809,42 @@ class MetashapeWorkflowLefolab:
         # Record processing time to log file
         with open(self.log_file, "a") as file:
             file.write(MetashapeWorkflowLefolab.sep.join(["Align Photos", time1]) + "\n")
+
+        return True
+
+    def optimize_cameras(self):
+        """
+        Uncheck the location reference of cameras whose reference error exceeds
+        max_reference_error on any axis, then optimize cameras once
+        """
+        # Imported here: src.ms_lib imports this module (convert_objects)
+        from src.ms_lib.process import optimize_cameras
+
+        timer_a = time.time()
+
+        report = optimize_cameras(
+            self.doc.chunk,
+            max_reference_error=self.cfg["optimizeCameras"]["max_reference_error"],
+            adaptive_fitting=self.cfg["optimizeCameras"]["adaptive_fitting"],
+        )
+
+        if not self.cfg["gcps"]:
+            self.doc.save()
+
+        elapsed = diff_time(time.time(), timer_a)
+        summary = (
+            f"{len(report['unchecked'])} references unchecked "
+            f"(max error {self.cfg['optimizeCameras']['max_reference_error']} m), "
+            f"{report['unaligned']} cameras unaligned"
+        )
+        print(f"[INFO] Optimize cameras: {summary}")
+
+        # Record processing time and outcome to log file
+        with open(self.log_file, "a") as file:
+            file.write(MetashapeWorkflowLefolab.sep.join(["Optimize Cameras", elapsed]) + "\n")
+            file.write(
+                MetashapeWorkflowLefolab.sep.join(["Optimize Cameras result", summary]) + "\n"
+            )
 
         return True
 

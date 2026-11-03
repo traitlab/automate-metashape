@@ -79,6 +79,13 @@ alignPhotos: # (Metashape: matchPhotos, alignCameras)
     keypoint_limit_per_mpx: 1000 # Default to 1000
     tiepoint_limit: 0 # Default to 4000, 0 for no limit
 
+# Uncheck the location reference of cameras that disagree with their aligned position, then re-optimize once.
+# Runs after alignPhotos, or alone on a loaded project. Unaligned cameras are left as they are.
+optimizeCameras: # (Metashape: optimizeCameras)
+    enabled: False
+    max_reference_error: [1.0, 1.0, 1.0] # Metres in X (east), Y (north), Z (up). A camera whose reference error exceeds any one of them is unchecked.
+    adaptive_fitting: False # Enable adaptive fitting of distortion coefficients. Lens parameters fixed in cameracalibration stay fixed.
+
 gcps: False # Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --gcps to continue.
 
 # The two steps below act on several chunks at once, so main.py doesn't run them currently (it processes one chunk per run).

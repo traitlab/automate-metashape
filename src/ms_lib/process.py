@@ -31,6 +31,7 @@ from src.model.config import (
     BuildOrthomosaicConfig,
     BuildPointCloudConfig,
     MergeChunksConfig,
+    OptimizeCamerasConfig,
 )
 from src.ms_lib.defaults import global_param, step_params
 
@@ -238,6 +239,47 @@ def align_photos(
     )
 
 
+def optimize_cameras(chunk, max_reference_error=None, adaptive_fitting=None, config_file=None):
+    """Uncheck the camera references that disagree with alignment, then optimize once.
+
+    A camera is unchecked when its reference error (see _reference_error_xyz)
+    exceeds ``max_reference_error`` -- metres in X (east), Y (north), Z (up) --
+    on any one axis. It keeps its place from the tie points but stops pulling
+    the georeferencing towards a wrong location, e.g. a photo QBase3D tagged
+    with a neighbouring exposure. Unaligned cameras have no error to compare
+    and are left as they are.
+
+    Returns a report: the unchecked camera labels and the number of unaligned
+    cameras.
+    """
+    p = step_params(
+        "optimizeCameras",
+        OptimizeCamerasConfig,
+        config_file=config_file,
+        max_reference_error=max_reference_error,
+        adaptive_fitting=adaptive_fitting,
+    )
+    limits = p["max_reference_error"]
+
+    unchecked = []
+    unaligned = 0
+    for camera in chunk.cameras:
+        if camera.transform is None:
+            unaligned += 1
+            continue
+        if not camera.reference.location_enabled:
+            continue
+        error = _reference_error_xyz(chunk, camera)
+        if error is not None and any(
+            abs(e) > limit for e, limit in zip(error, limits, strict=True)
+        ):
+            camera.reference.location_enabled = False
+            unchecked.append(camera.label)
+
+    chunk.optimizeCameras(adaptive_fitting=p["adaptive_fitting"])
+    return {"unchecked": unchecked, "unaligned": unaligned}
+
+
 def reset_region(chunk):
     """Reset the region and triple its Z extent.
 
@@ -431,13 +473,14 @@ def merge_chunks(
     return merged_chunk
 
 
-def _reference_error(chunk, camera):
-    """Metres between a camera's estimated centre and the location it carries.
+def _reference_error_xyz(chunk, camera):
+    """Per-axis metres between a camera's estimated centre and the location it carries.
 
-    The number Metashape shows as "Error (m)" in the Reference pane: estimated
+    What Metashape shows as "X/Y/Z error (m)" in the Reference pane: estimated
     centre and reference location both brought to geocentric coordinates and
     differenced in the local east-north-up frame, so the result is metres
-    whatever units the chunk CRS is in.
+    whatever units the chunk CRS is in. Returns a Metashape.Vector (east,
+    north, up).
 
     Returns None for a camera that is not aligned or carries no reference,
     which has no error to compare.
@@ -447,7 +490,17 @@ def _reference_error(chunk, camera):
 
     estimated = chunk.transform.matrix.mulp(camera.center)
     reference = chunk.crs.unproject(camera.reference.location)
-    return chunk.crs.localframe(estimated).mulv(estimated - reference).norm()
+    return chunk.crs.localframe(estimated).mulv(estimated - reference)
+
+
+def _reference_error(chunk, camera):
+    """Metres between a camera's estimated centre and the location it carries.
+
+    The number Metashape shows as "Error (m)" in the Reference pane, i.e. the
+    norm of _reference_error_xyz. None for an unaligned or unreferenced camera.
+    """
+    error = _reference_error_xyz(chunk, camera)
+    return None if error is None else error.norm()
 
 
 def deduplicate_cameras(chunk, remove=False, reset=False):

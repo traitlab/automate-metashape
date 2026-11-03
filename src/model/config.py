@@ -6,7 +6,14 @@ import re
 from enum import Enum
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveFloat,
+    field_validator,
+    model_validator,
+)
 
 
 class MetashapeFiltering(str, Enum):
@@ -160,6 +167,17 @@ class AlignPhotosConfig(BaseModel):
         if v not in valid_values:
             raise ValueError(f"downscale must be one of {valid_values}")
         return v
+
+
+class OptimizeCamerasConfig(BaseModel):
+    """Configuration for unchecking bad camera references and re-optimizing"""
+
+    enabled: bool = False
+    # Metres in X (east), Y (north), Z (up); a camera over any one is unchecked
+    max_reference_error: List[PositiveFloat] = Field(
+        default=[1.0, 1.0, 1.0], min_length=3, max_length=3
+    )
+    adaptive_fitting: bool = False
 
 
 class AlignChunksConfig(BaseModel):
@@ -340,6 +358,7 @@ class MetashapeConfig(BaseModel):
     # Processing steps
     addPhotos: AddPhotosConfig = Field(default_factory=AddPhotosConfig)
     alignPhotos: AlignPhotosConfig = Field(default_factory=AlignPhotosConfig)
+    optimizeCameras: OptimizeCamerasConfig = Field(default_factory=OptimizeCamerasConfig)
     # Multi-chunk steps. main.py processes one chunk per run and does not reach
     # these; scripts/run_task.py does. They live here so their parameters come
     # from the same config and the same validation as every other step.

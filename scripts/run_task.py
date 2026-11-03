@@ -42,6 +42,14 @@ export_ortho then writes a 0-1 reflectance <chunk>_ms.tif next to the 0-255
         --task calibrate_reflectance --task build_orthomosaic --task export_ortho \
         --output out/
 
+optimize_cameras unchecks the location reference of every aligned camera whose
+reference error exceeds optimizeCameras.max_reference_error (metres in X, Y, Z)
+on any axis, then optimizes cameras once:
+
+    python scripts/run_task.py \
+        --project path/to/project.psx \
+        --task optimize_cameras --config-file path/to/mission_config.yml
+
 align_chunks and merge_chunks act on a set of chunks rather than one. Name them
 with --chunks (repeat it) or leave it out to take every chunk in the project;
 the rest of the chain then continues on the merged chunk. Chunks that overlap
@@ -106,6 +114,14 @@ def task_disable_ms_references(doc, chunk, args):
 
 def task_align(doc, chunk, args):
     process.align_photos(chunk, config_file=args.config_file)
+
+
+def task_optimize_cameras(doc, chunk, args):
+    report = process.optimize_cameras(chunk, config_file=args.config_file)
+    print(
+        f"[run_task] unchecked {len(report['unchecked'])} camera references and optimized "
+        f"'{chunk.label}' ({report['unaligned']} cameras unaligned)"
+    )
 
 
 def task_align_chunks(doc, chunk, args):
@@ -247,6 +263,7 @@ TASKS = {
     "calibrate_reflectance": task_calibrate_reflectance,
     "disable_ms_references": task_disable_ms_references,
     "align": task_align,
+    "optimize_cameras": task_optimize_cameras,
     "align_chunks": task_align_chunks,
     "merge_chunks": task_merge_chunks,
     "deduplicate_cameras": task_deduplicate_cameras,

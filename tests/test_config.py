@@ -156,6 +156,30 @@ def test_invalid_step_values(mission_dir, values):
         base_config(mission_dir, **values)
 
 
+def test_optimize_cameras_defaults(mission_dir):
+    _, cfg = load(mission_dir)
+    assert cfg["optimizeCameras"] == {
+        "enabled": False,
+        "max_reference_error": [1.0, 1.0, 1.0],
+        "adaptive_fitting": False,
+    }
+
+
+def test_optimize_cameras_per_axis_threshold(mission_dir):
+    cfg = base_config(mission_dir, optimizeCameras={"max_reference_error": [0.5, 0.5, 2]})
+    assert cfg.optimizeCameras.max_reference_error == [0.5, 0.5, 2.0]
+
+
+@pytest.mark.parametrize(
+    "max_reference_error",
+    [[1.0, 1.0], [1.0, 1.0, 1.0, 1.0], [1.0, 0, 1.0], [1.0, -1.0, 1.0], 1.0],
+    ids=["two values", "four values", "zero", "negative", "scalar"],
+)
+def test_invalid_max_reference_error(mission_dir, max_reference_error):
+    with pytest.raises(ValidationError, match="max_reference_error"):
+        base_config(mission_dir, optimizeCameras={"max_reference_error": max_reference_error})
+
+
 def test_images_path_required_when_adding_photos():
     with pytest.raises(ValidationError, match="images_path"):
         MetashapeConfig(mission_id=MISSION_ID)
