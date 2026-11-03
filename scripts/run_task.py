@@ -191,6 +191,17 @@ def task_build_orthomosaic(doc, chunk, args):
     process.build_orthomosaic(chunk, args.crs, config_file=args.config_file)
 
 
+def task_remove_orthophotos(doc, chunk, args):
+    # Frees the per-camera orthorectified images kept alongside the orthomosaic.
+    # The orthomosaic itself stays and still exports, but its seamlines can no
+    # longer be edited.
+    if chunk.orthomosaic is None:
+        print(f"[run_task] no orthomosaic in '{chunk.label}', nothing to remove")
+        return
+    chunk.orthomosaic.removeOrthophotos()
+    print(f"[run_task] removed orthophotos from '{chunk.label}'")
+
+
 def task_export_ortho(doc, chunk, args):
     # A multi-camera rig (e.g. M3M RGB + MS bands) is split into a 0-1 reflectance
     # _ms.tif and a 0-255 _rgb.tif, as main.py does for a multispectral mission.
@@ -210,7 +221,11 @@ def task_export_ortho(doc, chunk, args):
 
 def task_export_dem(doc, chunk, args):
     export.export_dem(
-        chunk, output_path(args, chunk, "export_dem"), args.crs, config_file=args.config_file
+        chunk,
+        output_path(args, chunk, "export_dem"),
+        args.crs,
+        resolution=args.resolution,
+        config_file=args.config_file,
     )
 
 
@@ -244,6 +259,7 @@ TASKS = {
     "build_dem": task_build_dem,
     "build_dem_highdis": task_build_dem_highdis,
     "build_orthomosaic": task_build_orthomosaic,
+    "remove_orthophotos": task_remove_orthophotos,
     "export_ortho": task_export_ortho,
     "export_dem": task_export_dem,
     "export_point_cloud": task_export_point_cloud,
@@ -382,7 +398,7 @@ def parse_args(argv):
         "rule main.py applies to a fresh mission.",
     )
     parser.add_argument(
-        "--resolution", type=float, default=None, help="DEM build resolution in meters/pixel"
+        "--resolution", type=float, default=None, help="DEM build and export resolution in meters/pixel"
     )
     parser.add_argument(
         "--no-cuda", action="store_true", help="Use OpenCL instead of CUDA for GPU steps"

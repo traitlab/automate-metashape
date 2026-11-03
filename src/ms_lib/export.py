@@ -252,6 +252,7 @@ def export_dem(
     chunk,
     output_path,
     crs,
+    resolution=None,
     nodata=None,
     tiff_big=None,
     tiff_tiled=None,
@@ -259,11 +260,16 @@ def export_dem(
     section="buildDem",
     config_file=None,
 ):
-    """Export the active elevation as a GeoTIFF in ``crs`` (a required "EPSG::<code>")."""
+    """Export the active elevation as a GeoTIFF in ``crs`` (a required "EPSG::<code>").
+
+    ``resolution`` (meters/pixel, 0 = native) is applied here because buildDem
+    seems to keep the native GSD even when given a coarser resolution.
+    """
     p = step_params(
         section,
         BuildDemConfig,
         config_file=config_file,
+        resolution=resolution,
         nodata=nodata,
         tiff_big=tiff_big,
         tiff_tiled=tiff_tiled,
@@ -273,6 +279,7 @@ def export_dem(
     chunk.exportRaster(
         path=output_path,
         projection=_projection(crs),
+        resolution=p["resolution"],
         nodata_value=p["nodata"],
         source_data=Metashape.ElevationData,
         image_compression=_image_compression(p["tiff_big"], p["tiff_tiled"], p["tiff_overviews"]),
