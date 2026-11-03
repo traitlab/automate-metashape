@@ -415,7 +415,10 @@ def parse_args(argv):
         "rule main.py applies to a fresh mission.",
     )
     parser.add_argument(
-        "--resolution", type=float, default=None, help="DEM build and export resolution in meters/pixel"
+        "--resolution",
+        type=float,
+        default=None,
+        help="DEM build and export resolution in meters/pixel",
     )
     parser.add_argument(
         "--no-cuda", action="store_true", help="Use OpenCL instead of CUDA for GPU steps"
