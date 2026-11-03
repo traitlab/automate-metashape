@@ -52,7 +52,9 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("missions", nargs="+", help="Mission folder(s) containing *_Geotagged/<camera>/*.jpg")
+    parser.add_argument(
+        "missions", nargs="+", help="Mission folder(s) containing *_Geotagged/<camera>/*.jpg"
+    )
     parser.add_argument(
         "--output-dir",
         help="Write <mission>_POS.txt here instead of into each mission folder",
@@ -131,7 +133,11 @@ def rematch(photos):
             continue
         # Flight direction from the neighbouring seconds' centres
         a = centre[seconds[i - 1]] if i > 0 and seconds[i - 1] >= s - 2 else centre[s]
-        b = centre[seconds[i + 1]] if i + 1 < len(seconds) and seconds[i + 1] <= s + 2 else centre[s]
+        b = (
+            centre[seconds[i + 1]]
+            if i + 1 < len(seconds) and seconds[i + 1] <= s + 2
+            else centre[s]
+        )
         vn, ve = (b[0] - a[0]) * m_n, (b[1] - a[1]) * m_e
         if math.hypot(vn, ve) < 1:
             for p in group:
@@ -139,14 +145,18 @@ def rematch(photos):
             counts["no direction"] += len(group)
             continue
         events = sorted(group, key=lambda e: e["tag"][0] * m_n * vn + e["tag"][1] * m_e * ve)
-        for p, e in zip(group, events):  # group is already in filename order
+        for p, e in zip(group, events, strict=True):  # group is already in filename order
             p["event"] = e
             counts["changed" if e is not p else "unchanged"] += 1
     return counts
 
 
+def fmt(value, ndigits):
+    """Fixed-point number, or an empty field when the tag was missing."""
+    return "" if value is None else f"{value:.{ndigits}f}"
+
+
 def write_pos(photos, path):
-    fmt = lambda v, nd: "" if v is None else f"{v:.{nd}f}"
     with open(path, "w") as f:
         f.write("label,lat,lon,alt,yaw,pitch,roll,sxy,sz\n")
         for p in photos:
