@@ -4,18 +4,23 @@ Rebuild the camera positions of QBase3D-geotagged P5 missions and write them as
 a <mission>_POS.txt that addPhotos.import_reference can load.
 
 QBase3D matches each photo to its PPK camera event by EXIF capture time, which
-the P5 only writes to the whole second. It always picks an event from the right
-second, but within a second (2-4 photos) the order is arbitrary, so about half
-of the photos get the position of a neighbouring exposure, 8-24 m along track.
+the P5 only writes to the whole second. Within a second (2-4 photos) the order
+is arbitrary, so about half of the photos get the tag of a neighbouring
+exposure, 8-24 m along track.
 
-Within each EXIF second the photos' own tags are therefore exactly that
-second's event positions, only shuffled. This sorts them along the flight
-direction (= time order) and gives them back to the photos in filename order
-(= capture order). Only the images are read; the .pgt is not needed. On
-missions 8-10 of bciwhole_p5 this matched a .pgt-based re-match within 10 cm.
+A tag is a whole event: position, orientation and accuracy (QBase3D replaces
+the camera's own IMU orientation with one from its event log). Within each
+EXIF second the photos' tags are that second's events, only shuffled. This
+sorts them along the flight direction (= time order) and gives them back to
+the photos in filename order (= capture order). Only the images are read; the
+.pgt is not needed.
 
-Photos whose EXIF second itself is wrong (~2-5%) stay misplaced; flag them
-after alignment by their camera error.
+Tag positions are the camera centre: the .pgt antenna position plus a fixed
+lever arm (~0.31 m forward on bciwhole_p5). They differ from the .pgt by that
+offset.
+
+About 4-5% of photos, and up to 20% for some missions, get an event from the neighbouring second; these stay
+misplaced by one exposure. Flag them after alignment by their camera error.
 
 Output columns match import_reference in metashape_workflow_functions_lefolab.py:
 
@@ -96,7 +101,11 @@ def read_photo(path):
 
 
 def rematch(photos):
-    """Reassign the tags within each EXIF second in flight order. Returns a summary count."""
+    """Reassign the events within each EXIF second in flight order.
+
+    Sets p["event"] to the photo whose tag (position, rotation, accuracy) p should get.
+    Returns a summary count.
+    """
     lat0 = math.radians(photos[0]["tag"][0])
     m_n = 111132.954 - 559.822 * math.cos(2 * lat0)
     m_e = 111412.84 * math.cos(lat0)
@@ -117,7 +126,7 @@ def rematch(photos):
     for i, s in enumerate(seconds):
         group = by_second[s]
         if len(group) == 1:
-            group[0]["new"] = group[0]["tag"]
+            group[0]["event"] = group[0]
             counts["single"] += 1
             continue
         # Flight direction from the neighbouring seconds' centres
@@ -126,13 +135,13 @@ def rematch(photos):
         vn, ve = (b[0] - a[0]) * m_n, (b[1] - a[1]) * m_e
         if math.hypot(vn, ve) < 1:
             for p in group:
-                p["new"] = p["tag"]
+                p["event"] = p
             counts["no direction"] += len(group)
             continue
-        tags = sorted((p["tag"] for p in group), key=lambda t: t[0] * m_n * vn + t[1] * m_e * ve)
-        for p, t in zip(group, tags):  # group is already in filename order
-            p["new"] = t
-            counts["changed" if t != p["tag"] else "unchanged"] += 1
+        events = sorted(group, key=lambda e: e["tag"][0] * m_n * vn + e["tag"][1] * m_e * ve)
+        for p, e in zip(group, events):  # group is already in filename order
+            p["event"] = e
+            counts["changed" if e is not p else "unchanged"] += 1
     return counts
 
 
@@ -141,9 +150,10 @@ def write_pos(photos, path):
     with open(path, "w") as f:
         f.write("label,lat,lon,alt,yaw,pitch,roll,sxy,sz\n")
         for p in photos:
-            lat, lon, alt = p["new"]
-            yaw, pitch, roll = p["rotation"]
-            sxy, sz = p["accuracy"]
+            e = p["event"]
+            lat, lon, alt = e["tag"]
+            yaw, pitch, roll = e["rotation"]
+            sxy, sz = e["accuracy"]
             f.write(
                 f"{p['label']},{lat:.9f},{lon:.9f},{alt:.4f},"
                 f"{fmt(yaw, 3)},{fmt(pitch, 3)},{fmt(roll, 3)},{fmt(sxy, 4)},{fmt(sz, 4)}\n"
