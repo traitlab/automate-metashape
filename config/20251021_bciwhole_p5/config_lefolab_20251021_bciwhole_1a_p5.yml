@@ -27,8 +27,8 @@ project_crs: "EPSG::32617"
 
 # Project to load. If blank, creates a new empty project.
 # Even if loading an existing project, all processing is saved as a new project. The original project file is not modified (except when new_chunk is enabled).
-load_project: ""
-new_chunk: False # When loading an existing project, should a new chunk be created inside the loaded project?
+load_project: "/mnt/nfs/conrad/labolaliberte_metashape_projects/2025/20251021_bciwhole_p5/20251021_bciwhole_p5.psx"
+new_chunk: True # When loading an existing project, should a new chunk be created inside the loaded project?
 
 #### Processing parameters:
 ## It is best to leave the default settings of this section unchanged.
@@ -41,10 +41,10 @@ new_chunk: False # When loading an existing project, should a new chunk be creat
 addPhotos: # (Metashape: addPhotos)
   enabled: True # This applies to the main photos specified in photo_path above. Secondary photos are always added and aligned if a path (or paths) is provided.
   multispectral: False # Is this a multispectral photo set? If RGB, set to False.
-  use_xmp_accuracy: True # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
-  photos_accuracy: 5 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
+  use_xmp_accuracy: False # Whether to use image EXIF RTK flags to make image geospatial accuracy more precise. If enabled but photos don't have RTK data, will treat them as regular photos and use the photos accuracy parameter.
+  photos_accuracy: 0.05 # Accuracy to set for photos, if xmp accuracy is not used, in units of the CRS
   load_reference: True
-  import_reference: False # Whether to import new reference for photos (DJI PPK csv) from a file. Default is False.
+  import_reference: True # Whether to import new reference for photos (DJI PPK csv) from a file. Default is False.
   load_xmp_calibration: True
   load_xmp_orientation: True
   load_xmp_accuracy: True
@@ -60,10 +60,10 @@ thermal_parameters:
     mission_start: null # Format:"2024-06-01 00:00:00"    Start time of the flight mission in local time (to align with weather station data). If not provided, using the timestamp by filename of the first photo.
     mission_end: null # Format:"2024-06-01 23:59:59"    End time of the flight mission in local time (to align with weather station data). IF not provided, using the timestamp by filename of the last photo.
 
-camera_calibration_path: "" # Path to camera calibration file. If not provided, Metashape will ignore this step.
+camera_calibration_path: "/home/acarong/GitHub/automate-metashape-dev/calibration/phaseonep5_bci.xml" # Path to camera calibration file. If not provided, Metashape will ignore this step.
 cameracalibration:
     format: Metashape.CalibrationFormatXML # Options: CalibrationFormatXML, CalibrationFormatPix4D, CalibrationFormatOpenCV, etc.
-    fixed_parameters: "" # Parameters to fix, provided as a list. ex: ["F","Cx","Cy","K1","K2","K3","P1","P2"]. If empty, no parameters fixed.
+    fixed_parameters: ["F","Cx","Cy","K1","K2","K3","P1","P2"] # Parameters to fix, provided as a list. ex: ["F","Cx","Cy","K1","K2","K3","P1","P2"]. If empty, no parameters fixed.
 
 alignPhotos: # (Metashape: matchPhotos, alignCameras)
     enabled: True
@@ -78,6 +78,13 @@ alignPhotos: # (Metashape: matchPhotos, alignCameras)
     keypoint_limit: 60000 # Default to 40000
     keypoint_limit_per_mpx: 1000 # Default to 1000
     tiepoint_limit: 0 # Default to 4000, 0 for no limit
+
+# Uncheck the location reference of cameras that disagree with their aligned position, then re-optimize once.
+# Runs after alignPhotos, or alone on a loaded project. Unaligned cameras are left as they are.
+optimizeCameras: # (Metashape: optimizeCameras)
+    enabled: True
+    max_reference_error: [1.0, 1.0, 1.0] # Metres in X (east), Y (north), Z (up). A camera whose reference error exceeds any one of them is unchecked.
+    adaptive_fitting: False # Enable adaptive fitting of distortion coefficients. Lens parameters fixed in cameracalibration stay fixed.
 
 gcps: False # Pause processing after photos alignment to allow GCPs to be added using the GUI, then rerun with --gcps to continue.
 
@@ -98,7 +105,7 @@ buildPointCloud: # (Metashape: buildPointCloud and exportPoints)
     remove_after_export: False # Remove point cloud from project after export of all dependencies (DEMs) to reduce the metashape project file size
 
 buildDem: # (Metashape: buildDem, (optionally) classifyGroundPoints, exportRaster)
-    enabled: False
+    enabled: True
     classify_ground_points: False # Should ground points be classified as part of this step? Note that an alternative is to calculate them as a part of buildPointCloud (above)
     resolution: 0 # DSM resolution. Only affects DSM built using the mesh (other DSM types are set by Metashape and not customizable). Note that this also sets the resolution of the orthomosaic built from this DSM, which is 1/4 of the DSM resolution. If using a mesh-derived DSM, and you also desire an orthomosaic with maximal detail, set the DEM resolution to 4x your GSD. Set to 0 to use Metashape-determined default.
     export: True # Whether to export DEM(s)
