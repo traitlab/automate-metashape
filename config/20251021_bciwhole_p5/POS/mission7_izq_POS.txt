@@ -1,11 +1,11 @@
 label,lat,lon,alt,yaw,pitch,roll,sxy,sz
-/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087391.jpg,9.176075974,-79.863299026,152.5790,-168.230,-13.398,3.024,0.0100,0.0138
-/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087392.jpg,9.176012081,-79.863306432,152.5182,-171.126,-14.400,4.163,0.0100,0.0137
-/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087393.jpg,9.175943263,-79.863311182,152.5792,-174.763,-13.823,4.573,0.0100,0.0124
-/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087394.jpg,9.175875140,-79.863312750,152.7283,-177.606,-13.246,5.140,0.0100,0.0136
+/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087391.jpg,9.176012081,-79.863306432,152.5182,-171.126,-14.400,4.163,0.0100,0.0137
+/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087392.jpg,9.175943263,-79.863311182,152.5792,-174.763,-13.823,4.573,0.0100,0.0124
+/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087393.jpg,9.175875140,-79.863312750,152.7283,-177.606,-13.246,5.140,0.0100,0.0136
+/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087394.jpg,9.175806215,-79.863311325,152.9780,-179.406,-10.603,6.023,0.0100,0.0124
 /mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087395.jpg,9.175806215,-79.863311325,152.9780,-179.406,-10.603,6.023,0.0100,0.0124
 /mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087396.jpg,9.173695560,-79.863254960,159.5975,-178.663,-1.360,3.081,0.0100,0.0126
-/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087397.jpg,9.173568046,-79.863252077,159.8679,175.396,-3.273,7.786,0.0100,0.0169
+/mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087397.jpg,9.173554247,-79.863251727,159.9300,175.396,-3.273,7.786,0.0100,0.0169
 /mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087398.jpg,9.173505401,-79.863249456,160.2269,173.156,-3.914,5.946,0.0100,0.0183
 /mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087399.jpg,9.173450932,-79.863246192,160.4563,173.109,-2.784,5.122,0.0100,0.0166
 /mnt/nfs/conrad/labolaliberte_metashape_projects/bciwhole_p5/mission7_izq/log_0303_Geotagged/P5 (80mm)/P0087400.jpg,9.173396621,-79.863242273,160.6509,173.245,-1.085,5.446,0.0100,0.0165
